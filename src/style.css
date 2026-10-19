@@ -59,6 +59,8 @@ button { font: inherit; }
 .eyebrow, .micro-label { margin: 0; color: var(--cyan); font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: 0.22em; }
 .brand-lockup { min-width: 0; }
 .brand-byline { margin: 2px 0 0; color: var(--muted); font: 700 6px/1 "Space Mono", monospace; letter-spacing: 0.14em; white-space: nowrap; }
+.brand-meta { display: flex; align-items: center; gap: 6px; }
+.mode-switch { margin-top: 2px; padding: 1px 4px; border: 1px solid rgba(73, 231, 255, 0.22); color: var(--cyan); background: rgba(73, 231, 255, 0.06); font: 700 5px/1.2 "Space Mono", monospace; letter-spacing: 0.08em; cursor: pointer; }
 h1 { margin: 2px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em; line-height: 1; }
 .run-stats { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 700 9px "Space Mono", monospace; letter-spacing: 0.08em; }
 .run-stats strong { color: var(--text); font-size: 14px; }
@@ -71,6 +73,63 @@ h1 { margin: 2px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
   .brand-byline { font-size: 5px; }
   .run-stats { gap: 6px; font-size: 8px; }
   .icon-button { width: 32px; height: 32px; }
+}
+
+.mode-select {
+  min-height: 100svh;
+  padding: max(24px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+}
+.mode-select[hidden] { display: none; }
+.mode-select-shell { width: min(100%, 920px); }
+.mode-brand { margin-bottom: clamp(30px, 6vh, 64px); text-align: center; }
+.mode-brand .brand-byline { margin-top: 5px; }
+.mode-mark { position: relative; width: 58px; height: 58px; margin: 0 auto 14px; border: 1px solid rgba(73, 231, 255, 0.25); border-radius: 15px; background: #070b12; box-shadow: 0 0 30px rgba(73, 231, 255, 0.08); }
+.mode-mark i { position: absolute; width: 24px; height: 3px; background: currentColor; transform-origin: center; }
+.mode-mark i:nth-child(1) { top: 16px; left: 8px; color: var(--cyan); transform: rotate(55deg); }
+.mode-mark i:nth-child(2) { top: 16px; right: 8px; color: var(--pink); transform: rotate(-55deg); }
+.mode-mark i:nth-child(3) { bottom: 16px; left: 8px; color: var(--pink); transform: rotate(-55deg); }
+.mode-mark i:nth-child(4) { right: 8px; bottom: 16px; color: var(--cyan); transform: rotate(55deg); }
+.mode-mark b { position: absolute; inset: 23px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 14px rgba(255, 204, 88, 0.65); }
+.mode-intro { max-width: 650px; margin: 0 auto 22px; text-align: center; }
+.mode-intro h1 { margin: 7px 0 8px; font-size: clamp(27px, 5vw, 46px); line-height: 1.05; text-transform: uppercase; }
+.mode-intro > p:last-child { margin: 0; color: var(--muted); font-size: 13px; }
+.mode-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mode-card { min-width: 0; padding: 18px; display: flex; flex-direction: column; align-items: stretch; border: 1px solid rgba(73, 231, 255, 0.28); color: var(--text); background: linear-gradient(145deg, rgba(14, 25, 35, 0.96), rgba(6, 9, 15, 0.96)); text-align: left; cursor: pointer; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); transition: transform 0.18s ease, border-color 0.18s ease, filter 0.18s ease; }
+.mode-card:hover, .mode-card:focus-visible { transform: translateY(-4px); border-color: var(--cyan); filter: brightness(1.12); outline: none; }
+.mode-card-quantum { border-color: rgba(167, 124, 255, 0.42); background: linear-gradient(145deg, rgba(24, 18, 39, 0.96), rgba(7, 9, 16, 0.97)); }
+.mode-card-quantum:hover, .mode-card-quantum:focus-visible { border-color: var(--violet); }
+.mode-card-top { display: flex; justify-content: space-between; color: var(--muted); font: 700 7px "Space Mono", monospace; letter-spacing: 0.1em; }
+.mode-card-top i { color: var(--cyan); font-style: normal; }
+.mode-card-top em { font-style: normal; }
+.mode-card > strong { margin-top: 15px; font: 700 clamp(22px, 4vw, 31px)/1 "Chakra Petch", sans-serif; letter-spacing: 0.06em; }
+.mode-card > small { margin-top: 5px; color: var(--gold); font: 700 8px "Space Mono", monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+.mode-card-quantum > small { color: var(--violet); }
+.mode-card > span:not(.mode-card-top, .mode-diagram) { min-height: 52px; margin-top: 15px; color: #9ab0ba; font-size: 11px; line-height: 1.45; }
+.mode-card > b { margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(118, 147, 162, 0.18); color: var(--cyan); font: 700 8px "Space Mono", monospace; letter-spacing: 0.1em; }
+.mode-card-quantum > b { color: var(--violet); }
+.mode-diagram { position: relative; height: 88px; margin-top: 15px; border-block: 1px solid rgba(73, 231, 255, 0.12); background: repeating-linear-gradient(90deg, transparent 0 38px, rgba(73, 231, 255, 0.035) 39px); overflow: hidden; }
+.mode-diagram i { position: absolute; top: 10px; bottom: 10px; width: 2px; background: var(--cyan); box-shadow: 0 0 10px currentColor; }
+.mode-diagram i::before, .mode-diagram i::after { content: ""; position: absolute; left: 50%; width: 9px; height: 9px; border: 2px solid currentColor; border-radius: 50%; background: #071019; transform: translateX(-50%); }
+.mode-diagram i::before { top: -5px; }
+.mode-diagram i::after { bottom: -5px; }
+.mode-diagram-loom i:nth-child(1) { left: 23%; }
+.mode-diagram-loom i:nth-child(2) { left: 50%; transform: rotate(13deg); color: var(--gold); }
+.mode-diagram-loom i:nth-child(3) { left: 77%; transform: rotate(-13deg); color: var(--pink); }
+.mode-diagram-quantum i:nth-child(1) { left: 20%; transform: rotate(-25deg); }
+.mode-diagram-quantum i:nth-child(2) { left: 40%; transform: rotate(25deg); color: var(--violet); }
+.mode-diagram-quantum i:nth-child(3) { left: 60%; transform: rotate(-25deg); color: var(--pink); }
+.mode-diagram-quantum i:nth-child(4) { left: 80%; transform: rotate(25deg); color: var(--gold); }
+.mode-footnote { margin: 15px 0 0; color: var(--muted); font: 7px "Space Mono", monospace; letter-spacing: 0.08em; text-align: center; }
+
+@media (max-width: 620px) {
+  .mode-select { align-items: start; }
+  .mode-brand { margin-bottom: 28px; }
+  .mode-grid { grid-template-columns: 1fr; }
+  .mode-card { padding: 15px; }
+  .mode-card > span:not(.mode-card-top, .mode-diagram) { min-height: 0; }
+  .mode-diagram { height: 66px; }
 }
 
 .objective-card {

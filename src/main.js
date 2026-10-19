@@ -16,14 +16,26 @@ const els = Object.fromEntries([
 
 const previewLevel = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get("sector")) : 0;
 const curriculumVersion = "1";
-if (!previewLevel && localStorage.getItem("quantum-loom-curriculum-version") !== curriculumVersion) {
-  const previousLevel = Number(localStorage.getItem("quantum-loom-level") || 1);
-  if (previousLevel > 1) localStorage.setItem("quantum-loom-pre-curriculum-level", String(previousLevel));
-  localStorage.setItem("quantum-loom-level", "1");
-  localStorage.setItem("quantum-loom-curriculum-version", curriculumVersion);
+const quantumLevelKey = "quantum-loom-quantum-level";
+const quantumStreakKey = "quantum-loom-quantum-streak";
+const quantumCurriculumKey = "quantum-loom-quantum-curriculum-version";
+if (!localStorage.getItem(quantumLevelKey) && localStorage.getItem("quantum-loom-level")) {
+  localStorage.setItem(quantumLevelKey, localStorage.getItem("quantum-loom-level"));
 }
-let level = Math.max(1, previewLevel || Number(localStorage.getItem("quantum-loom-level") || 1));
-let streak = Number(localStorage.getItem("quantum-loom-streak") || 0);
+if (!localStorage.getItem(quantumStreakKey) && localStorage.getItem("quantum-loom-streak")) {
+  localStorage.setItem(quantumStreakKey, localStorage.getItem("quantum-loom-streak"));
+}
+if (!localStorage.getItem(quantumCurriculumKey) && localStorage.getItem("quantum-loom-curriculum-version")) {
+  localStorage.setItem(quantumCurriculumKey, localStorage.getItem("quantum-loom-curriculum-version"));
+}
+if (!previewLevel && localStorage.getItem(quantumCurriculumKey) !== curriculumVersion) {
+  const previousLevel = Number(localStorage.getItem(quantumLevelKey) || 1);
+  if (previousLevel > 1) localStorage.setItem("quantum-loom-pre-curriculum-level", String(previousLevel));
+  localStorage.setItem(quantumLevelKey, "1");
+  localStorage.setItem(quantumCurriculumKey, curriculumVersion);
+}
+let level = Math.max(1, previewLevel || Number(localStorage.getItem(quantumLevelKey) || 1));
+let streak = Number(localStorage.getItem(quantumStreakKey) || 0);
 let puzzle;
 let placed = [];
 let current = [];
@@ -440,13 +452,13 @@ function animateSimulation(time) {
 function showResult() {
   const rank = rankSolution(placed.length, puzzle.par);
   streak += 1;
-  localStorage.setItem("quantum-loom-streak", String(streak));
+  localStorage.setItem(quantumStreakKey, String(streak));
   els.streak.textContent = streak;
   els.rank.textContent = rank;
   els.resultGates.textContent = placed.length;
   els.resultPar.textContent = puzzle.par;
   if (tutorialActive) {
-    localStorage.setItem(`quantum-loom-lesson-${level}`, "complete");
+    localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "complete");
     tutorialActive = false;
     els.resultCopy.textContent = puzzle.lesson ? `${puzzle.lesson.title} complete. The next sector introduces one more idea.` : "Training complete.";
   } else {
@@ -463,7 +475,7 @@ function startLevel(forceTutorial = false) {
   els.pulse.textContent = "PULSE CIRCUIT";
   setControlsLocked(false);
   puzzle = generatePuzzle(level);
-  tutorialActive = Boolean(puzzle.isLesson && (forceTutorial || localStorage.getItem(`quantum-loom-lesson-${level}`) !== "skipped"));
+  tutorialActive = Boolean(puzzle.isLesson && (forceTutorial || localStorage.getItem(`quantum-loom-quantum-lesson-${level}`) !== "skipped"));
   placed = [];
   current = puzzle.initial.map((amplitude) => ({ ...amplitude }));
   els.level.textContent = String(level).padStart(2, "0");
@@ -490,9 +502,9 @@ function tone(frequency, duration) {
 els.pulse.addEventListener("click", pulseCircuit);
 els.undo.addEventListener("click", () => placed.length && removeGate(placed.length - 1));
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
-els.next.addEventListener("click", () => { level += 1; localStorage.setItem("quantum-loom-level", String(level)); startLevel(); });
+els.next.addEventListener("click", () => { level += 1; localStorage.setItem(quantumLevelKey, String(level)); startLevel(); });
 els.tutorialReplay.addEventListener("click", () => { els.result.classList.remove("visible"); els.result.hidden = true; startLevel(true); });
-els.tutorialSkip.addEventListener("click", () => { tutorialActive = false; localStorage.setItem(`quantum-loom-lesson-${level}`, "skipped"); updateTutorial(); });
+els.tutorialSkip.addEventListener("click", () => { tutorialActive = false; localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "skipped"); updateTutorial(); });
 els.sound.addEventListener("click", () => { soundOn = !soundOn; els.sound.textContent = soundOn ? "◉" : "○"; });
 
 function resize() {

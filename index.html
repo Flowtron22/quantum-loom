@@ -28,12 +28,49 @@
     <title>QuantumLoom — Ureka Games</title>
   </head>
   <body>
+    <section id="mode-select" class="mode-select" aria-labelledby="mode-select-title" hidden>
+      <div class="mode-select-shell">
+        <div class="mode-brand">
+          <div class="mode-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+          <p class="eyebrow">QuantumLoom</p>
+          <p class="brand-byline">by Ureka Games</p>
+        </div>
+        <div class="mode-intro">
+          <p class="micro-label">SELECT CAMPAIGN</p>
+          <h1 id="mode-select-title">Choose your way into the loom</h1>
+          <p>Learn with readable strands, or enter the complete quantum state vector.</p>
+        </div>
+        <div class="mode-grid">
+          <button class="mode-card mode-card-loom" data-mode="loom">
+            <span class="mode-card-top"><i>01</i><em>RECOMMENDED START</em></span>
+            <span class="mode-diagram mode-diagram-loom" aria-hidden="true"><i></i><i></i><i></i></span>
+            <strong>LOOM MODE</strong>
+            <small>Easy · Visual strands</small>
+            <span>Transform each qubit separately, follow crossing circuits, and learn X, H, and Z through direct feedback.</span>
+            <b id="loom-progress">BEGIN AT SECTOR 01 →</b>
+          </button>
+          <button class="mode-card mode-card-quantum" data-mode="quantum">
+            <span class="mode-card-top"><i>02</i><em>FULL SIMULATION</em></span>
+            <span class="mode-diagram mode-diagram-quantum" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <strong>QUANTUM MODE</strong>
+            <small>Advanced · State vectors</small>
+            <span>Control amplitudes, phase, interference, and entanglement across every computational basis lane.</span>
+            <b id="quantum-progress">BEGIN AT SECTOR 01 →</b>
+          </button>
+        </div>
+        <p class="mode-footnote">Each campaign keeps its own sectors, streak, and tutorial progress.</p>
+      </div>
+    </section>
+
     <main id="app" aria-label="QuantumLoom game by Ureka Games">
       <section class="game-shell">
         <header class="topbar">
           <div class="brand-lockup">
             <p class="eyebrow">QuantumLoom</p>
-            <p class="brand-byline">by Ureka Games</p>
+            <div class="brand-meta">
+              <p class="brand-byline">by Ureka Games</p>
+              <button id="mode-switch" class="mode-switch" type="button">CHANGE MODE</button>
+            </div>
             <h1>SECTOR <span id="level">01</span></h1>
           </div>
           <div class="run-stats" aria-label="Run statistics">
@@ -122,6 +159,6 @@
       </div>
     </div>
 
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/boot.js"></script>
   </body>
 </html>
