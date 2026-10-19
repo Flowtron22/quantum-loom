@@ -38,8 +38,8 @@ if (!validModes.has(mode)) {
   document.body.dataset.mode = mode;
   modeSelect.hidden = true;
   app.hidden = false;
-  modeSwitch.textContent = mode === "loom" ? "LOOM MODE" : "QUANTUM MODE";
-  modeSwitch.setAttribute("aria-label", `${modeSwitch.textContent}. Change game mode`);
+  modeSwitch.textContent = "⌂ HOME";
+  modeSwitch.setAttribute("aria-label", "Return to mode selection");
   document.querySelector(".gate-panel-heading p:last-child").textContent = mode === "loom"
     ? "Transform each strand, then trace it to its routed output"
     : "Build a reversible algorithm, then align every output amplitude";

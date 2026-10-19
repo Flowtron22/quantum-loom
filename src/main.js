@@ -9,7 +9,7 @@ const els = Object.fromEntries([
   ["result", "#result"], ["rank", "#rank"], ["resultGates", "#result-gates"], ["resultPar", "#result-par"],
   ["resultCopy", "#result-copy"], ["next", "#next"], ["sound", "#sound-toggle"],
   ["tutorialReplay", "#tutorial-replay"], ["tutorialCoach", "#tutorial-coach"], ["tutorialStep", "#tutorial-step"],
-  ["tutorialTitle", "#tutorial-title"], ["tutorialCopy", "#tutorial-copy"], ["tutorialSkip", "#tutorial-skip"],
+  ["tutorialTitle", "#tutorial-title"], ["tutorialCopy", "#tutorial-copy"], ["tutorialSkip", "#tutorial-skip"], ["tutorialStart", "#tutorial-start"],
   ["physicsStatus", "#physics-status"], ["physicsStatusText", "#physics-status-text"],
   ["routingStatus", "#routing-status"], ["shell", ".game-shell"],
 ].map(([key, selector]) => [key, document.querySelector(selector)]));
@@ -41,6 +41,9 @@ let placed = [];
 let current = [];
 let tutorialActive = false;
 let helpOpen = false;
+let helpResumeTutorial = false;
+let tutorialReplayMode = false;
+let tutorialResumeLevel = 1;
 let simulation = null;
 let soundOn = true;
 let audioContext;
@@ -296,11 +299,12 @@ function updateTutorial() {
   els.tutorialCoach.hidden = !(tutorialActive || helpOpen);
   els.tray.querySelectorAll(".gate").forEach((button) => button.classList.remove("hinted"));
   els.pulse.classList.remove("tutorial-hint");
-  els.tutorialSkip.textContent = helpOpen && !tutorialActive ? "CLOSE" : "SKIP";
+  els.tutorialStart.hidden = !helpOpen;
+  els.tutorialSkip.textContent = helpOpen ? "CLOSE" : tutorialReplayMode ? "HIDE GUIDE" : "SKIP";
   if (helpOpen && !tutorialActive) {
-    els.tutorialStep.textContent = "GUIDE";
-    els.tutorialTitle.textContent = "Quantum Mode Reference";
-    els.tutorialCopy.textContent = "X moves amplitudes, H splits and recombines them, Z changes relative phase, and C·X flips a target only when its control is 1. Match every target amplitude, then pulse.";
+    els.tutorialStep.textContent = "1—9";
+    els.tutorialTitle.textContent = "Replay Quantum Training";
+    els.tutorialCopy.textContent = "Restart the nine guided lessons for X, H, Z, basis lanes, control, interference, and entanglement. Your current sector is preserved and restored when training ends.";
     return;
   }
   if (!tutorialActive) return;
@@ -459,19 +463,24 @@ function animateSimulation(time) {
 
 function showResult() {
   const rank = rankSolution(placed.length, puzzle.par);
-  streak += 1;
-  localStorage.setItem(quantumStreakKey, String(streak));
+  if (!tutorialReplayMode) {
+    streak += 1;
+    localStorage.setItem(quantumStreakKey, String(streak));
+  }
   els.streak.textContent = streak;
   els.rank.textContent = rank;
   els.resultGates.textContent = placed.length;
   els.resultPar.textContent = puzzle.par;
   if (tutorialActive) {
-    localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "complete");
+    if (!tutorialReplayMode) localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "complete");
     tutorialActive = false;
-    els.resultCopy.textContent = puzzle.lesson ? `${puzzle.lesson.title} complete. The next sector introduces one more idea.` : "Training complete.";
+    els.resultCopy.textContent = tutorialReplayMode
+      ? `Training lesson ${level} of 9 complete.`
+      : puzzle.lesson ? `${puzzle.lesson.title} complete. The next sector introduces one more idea.` : "Training complete.";
   } else {
     els.resultCopy.textContent = rank === "S" ? "Optimal state-vector alignment." : rank === "A" ? "Stable circuit. One step from par." : "Aligned, but the algorithm can be shorter.";
   }
+  els.next.textContent = tutorialReplayMode ? (level < 9 ? "NEXT LESSON" : `RETURN TO SECTOR ${String(tutorialResumeLevel).padStart(2, "0")}`) : "NEXT SECTOR";
   els.result.hidden = false;
   requestAnimationFrame(() => els.result.classList.add("visible"));
 }
@@ -479,6 +488,7 @@ function showResult() {
 function startLevel(forceTutorial = false) {
   simulation = null;
   helpOpen = false;
+  helpResumeTutorial = false;
   clearGroup(pulseActors); clearGroup(bursts);
   els.physicsStatus.hidden = true;
   els.pulse.textContent = "PULSE CIRCUIT";
@@ -511,22 +521,51 @@ function tone(frequency, duration) {
 els.pulse.addEventListener("click", pulseCircuit);
 els.undo.addEventListener("click", () => placed.length && removeGate(placed.length - 1));
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
-els.next.addEventListener("click", () => { level += 1; localStorage.setItem(quantumLevelKey, String(level)); startLevel(); });
+els.next.addEventListener("click", () => {
+  if (tutorialReplayMode) {
+    if (level < 9) {
+      level += 1;
+      startLevel(true);
+    } else {
+      level = tutorialResumeLevel;
+      tutorialReplayMode = false;
+      startLevel();
+    }
+    return;
+  }
+  level += 1;
+  localStorage.setItem(quantumLevelKey, String(level));
+  startLevel();
+});
 els.tutorialReplay.addEventListener("click", () => {
   els.result.classList.remove("visible"); els.result.hidden = true;
-  if (puzzle.isLesson) {
-    startLevel(true);
+  if (helpOpen) {
+    helpOpen = false;
+    tutorialActive = helpResumeTutorial;
+    helpResumeTutorial = false;
   } else {
-    helpOpen = !helpOpen;
-    updateTutorial();
+    helpResumeTutorial = tutorialActive;
+    tutorialActive = false;
+    helpOpen = true;
   }
+  updateTutorial();
+});
+els.tutorialStart.addEventListener("click", () => {
+  tutorialResumeLevel = Math.max(1, Number(localStorage.getItem(quantumLevelKey) || level));
+  tutorialReplayMode = true;
+  helpOpen = false;
+  helpResumeTutorial = false;
+  level = 1;
+  startLevel(true);
 });
 els.tutorialSkip.addEventListener("click", () => {
   if (helpOpen && !tutorialActive) {
     helpOpen = false;
+    tutorialActive = helpResumeTutorial;
+    helpResumeTutorial = false;
   } else {
     tutorialActive = false;
-    localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "skipped");
+    if (!tutorialReplayMode) localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "skipped");
   }
   updateTutorial();
 });
