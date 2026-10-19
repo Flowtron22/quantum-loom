@@ -36,6 +36,7 @@ button { font: inherit; }
   display: grid;
   place-items: center;
 }
+#app[hidden] { display: none; }
 
 .game-shell {
   position: relative;
@@ -55,14 +56,15 @@ button { font: inherit; }
 .loom-panel { grid-row: 4; }
 .gate-panel { grid-row: 5; }
 .controls { grid-row: 6; }
-.topbar { display: flex; align-items: center; justify-content: space-between; }
+.topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .eyebrow, .micro-label { margin: 0; color: var(--cyan); font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: 0.22em; }
 .brand-lockup { min-width: 0; }
 .brand-byline { margin: 2px 0 0; color: var(--muted); font: 700 6px/1 "Space Mono", monospace; letter-spacing: 0.14em; white-space: nowrap; }
 .brand-meta { display: flex; align-items: center; gap: 6px; }
-.mode-switch { margin-top: 2px; padding: 2px 6px; border: 1px solid rgba(73, 231, 255, 0.32); color: var(--cyan); background: rgba(73, 231, 255, 0.08); font: 700 6px/1.2 "Space Mono", monospace; letter-spacing: 0.08em; cursor: pointer; }
+.mode-switch { display: grid; place-items: center; padding: 0; }
+.mode-switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 h1 { margin: 2px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em; line-height: 1; }
-.run-stats { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 700 9px "Space Mono", monospace; letter-spacing: 0.08em; }
+.run-stats { display: flex; justify-self: end; align-items: center; gap: 10px; color: var(--muted); font: 700 9px "Space Mono", monospace; letter-spacing: 0.08em; white-space: nowrap; }
 .run-stats strong { color: var(--text); font-size: 14px; }
 .icon-button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; color: var(--cyan); background: #0a1018; cursor: pointer; }
 .help-button { color: var(--gold); border-color: rgba(255, 204, 88, 0.32); font: 700 14px "Space Mono", monospace; }
