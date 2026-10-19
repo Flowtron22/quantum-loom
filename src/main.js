@@ -131,14 +131,12 @@ function renderState(container, state) {
     .join("");
 }
 
-function makeCurve(start, end, bend, color) {
-  const curve = new THREE.CubicBezierCurve3(
-    start,
-    new THREE.Vector3(start.x + bend, start.y - 1.2, 0.2),
-    new THREE.Vector3(end.x - bend, end.y + 1.2, 0.2),
-    end,
+function makeWire(x, startY, endY, color) {
+  const curve = new THREE.LineCurve3(
+    new THREE.Vector3(x, startY, 0),
+    new THREE.Vector3(x, endY, 0),
   );
-  const geometry = new THREE.TubeGeometry(curve, 42, 0.025, 6, false);
+  const geometry = new THREE.TubeGeometry(curve, 12, 0.024, 6, false);
   const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending });
   return new THREE.Mesh(geometry, material);
 }
@@ -166,29 +164,37 @@ function createGateMachine(gate, index, xs) {
   const group = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0x18232d, metalness: 0.92, roughness: 0.22 });
   const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.4, metalness: 0.35, roughness: 0.18 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.065, 8, 28), glow);
-  group.add(ring);
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.18, 12), metal);
-  hub.rotation.x = Math.PI / 2;
-  group.add(hub);
+  const chip = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.18, 0.12), metal);
+  group.add(chip);
+  const signalBar = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.035, 0.15), glow);
+  group.add(signalBar);
+  for (const y of [-0.14, 0.14]) {
+    const pin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.08), glow);
+    pin.position.y = y;
+    group.add(pin);
+  }
 
   if (gate.type === "X") {
     for (const rotation of [Math.PI / 4, -Math.PI / 4]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), glow);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.08), glow);
       bar.rotation.z = rotation;
+      bar.position.z = 0.08;
       group.add(bar);
     }
   } else if (gate.type === "H") {
-    for (const x of [-0.15, 0.15]) {
-      const prong = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), glow);
+    for (const x of [-0.055, 0.055]) {
+      const prong = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.15, 0.06), glow);
       prong.position.x = x;
+      prong.position.z = 0.08;
       group.add(prong);
     }
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.07, 0.08), glow);
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.025, 0.06), glow);
+    bridge.position.z = 0.08;
     group.add(bridge);
   } else {
-    const wave = new THREE.Mesh(new THREE.TorusKnotGeometry(0.17, 0.038, 40, 6, 2, 3), glow);
-    wave.scale.y = 0.72;
+    const wave = new THREE.Mesh(new THREE.TorusKnotGeometry(0.065, 0.014, 28, 5, 2, 3), glow);
+    wave.scale.y = 0.7;
+    wave.position.z = 0.08;
     group.add(wave);
   }
 
@@ -219,27 +225,36 @@ function rebuildLoom() {
   clearGroup(particles);
   const count = current.length;
   const xs = qubitXs(count);
+  const trace = traceCircuit(puzzle.initial, placed);
+  const levels = placed.map((_gate, index) => gateY(index, placed.length));
 
   current.forEach((value, index) => {
-    const color = stateColor(value);
-    const start = new THREE.Vector3(xs[index], 2.85, 0);
-    const targetIndex = placed.reduce((acc, gate) => gate.qubit === index && gate.type === "X" ? count - 1 - acc : acc, index);
-    const endX = xs[Math.max(0, Math.min(count - 1, targetIndex))];
-    strands.add(makeCurve(start, new THREE.Vector3(endX, -2.85, 0), value === "+" ? 1.1 : value === "-" ? -1.1 : 0.28 * (index % 2 ? 1 : -1), color));
+    let segmentTop = 2.85;
+    const relevantGates = levels
+      .map((y, gateIndex) => ({ y, gateIndex, gate: placed[gateIndex] }))
+      .filter(({ gate }) => gate.qubit === index);
+    relevantGates.forEach(({ y, gateIndex }) => {
+      strands.add(makeWire(xs[index], segmentTop, y + 0.11, stateColor(trace[gateIndex][index])));
+      segmentTop = y - 0.11;
+    });
+    strands.add(makeWire(xs[index], segmentTop, -2.85, stateColor(trace.at(-1)[index])));
 
     for (const y of [2.9, -2.9]) {
+      const endpointValue = y > 0 ? puzzle.initial[index] : value;
+      const color = stateColor(endpointValue);
       const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.25 });
       const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 20), material);
-      sphere.position.set(y > 0 ? xs[index] : endX, y, 0.05);
+      sphere.position.set(xs[index], y, 0.05);
       nodes.add(sphere);
     }
 
     for (let p = 0; p < 7; p += 1) {
+      const color = stateColor(value);
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.random() * 0.018, 8, 8),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
       );
-      dot.position.set(xs[index] + (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 5.7, -0.2);
+      dot.position.set(xs[index] + (Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 5.7, -0.2);
       dot.userData.speed = 0.002 + Math.random() * 0.004;
       particles.add(dot);
     }
@@ -257,7 +272,7 @@ function spawnPulseActors(state) {
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.5, roughness: 0.08 }),
     );
     actor.position.set(xs[qubit], 2.92, 0.5);
-    actor.userData = { qubit, state: value };
+    actor.userData = { qubit, state: value, baseX: xs[qubit] };
     pulseActors.add(actor);
   });
 }
@@ -477,7 +492,7 @@ function animatePhysicalRun(t) {
     actor.position.y = y;
     actor.rotation.x += 0.12;
     actor.rotation.y += 0.16;
-    actor.position.x += Math.sin(t * 16 + index) * 0.0025;
+    actor.position.x = actor.userData.baseX;
   });
 
   const crossed = placed.reduce((count, _gate, index) => progress >= (index + 1) / (placed.length + 1) ? count + 1 : count, 0) - 1;
@@ -605,7 +620,6 @@ function animate() {
     if (dot.position.y < -2.9) dot.position.y = 2.9;
   });
   gateMachines.children.forEach((machine, index) => {
-    machine.rotation.z += 0.004 * (index % 2 ? -1 : 1);
     machine.userData.recoil *= 0.82;
     const kick = machine.userData.recoil;
     machine.scale.set(1 + kick * 0.32, 1 - kick * 0.18, 1 + kick * 0.32);
