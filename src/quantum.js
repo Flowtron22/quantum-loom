@@ -43,6 +43,12 @@ export function traceCircuit(initial, gates) {
   return states;
 }
 
+export function routeState(state, routing = state.map((_, index) => index)) {
+  const output = Array(state.length);
+  routing.forEach((exit, source) => { output[exit] = state[source]; });
+  return output;
+}
+
 export function statesEqual(a, b) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
@@ -70,35 +76,74 @@ export function shortestPath(from, to, qubit) {
   return [];
 }
 
-export function generatePuzzle(level = 1, random = Math.random) {
-  const qubitCount = level < 3 ? 2 : 3;
-  const initial = Array.from({ length: qubitCount }, () => STATES[randomInt(2, random)]);
-  const minimumPar = Math.min(qubitCount * 2, 2 + Math.floor(level / 2));
-  let target = initial.slice();
-  let solution = [];
+export function qubitCountForLevel(level) {
+  if (level < 3) return 2;
+  if (level < 5) return 3;
+  if (level < 8) return 4;
+  if (level < 11) return 5;
+  if (level < 15) return 6;
+  if (level < 19) return 7;
+  if (level < 23) return 8;
+  if (level < 30) return 10;
+  return 12;
+}
 
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const candidate = Array.from({ length: qubitCount }, () => STATES[randomInt(STATES.length, random)]);
-    const candidateSolution = candidate.flatMap((value, qubit) => shortestPath(initial[qubit], value, qubit));
-    if (candidateSolution.length >= minimumPar || attempt === 79) {
-      target = candidate;
-      solution = candidateSolution;
-      break;
+function generateRouting(count, level, random) {
+  const routing = Array.from({ length: count }, (_, index) => index);
+  if (level < 6) return routing;
+
+  const swaps = level >= 23
+    ? count * 2
+    : Math.min(count + 2, 1 + Math.floor((level - 6) / 2));
+  for (let i = 0; i < swaps; i += 1) {
+    const left = randomInt(count - 1, random);
+    [routing[left], routing[left + 1]] = [routing[left + 1], routing[left]];
+  }
+  if (routing.every((exit, source) => exit === source)) {
+    [routing[0], routing[1]] = [routing[1], routing[0]];
+  }
+  return routing;
+}
+
+function countCrossings(routing) {
+  let crossings = 0;
+  for (let left = 0; left < routing.length; left += 1) {
+    for (let right = left + 1; right < routing.length; right += 1) {
+      if (routing[left] > routing[right]) crossings += 1;
     }
   }
+  return crossings;
+}
 
-  if (!solution.length) {
-    target[0] = initial[0] === "0" ? "1" : "0";
-    solution = shortestPath(initial[0], target[0], 0);
+export function generatePuzzle(level = 1, random = Math.random) {
+  const qubitCount = qubitCountForLevel(level);
+  const initial = Array.from({ length: qubitCount }, () => STATES[randomInt(2, random)]);
+  const routing = generateRouting(qubitCount, level, random);
+  const internalTarget = initial.slice();
+  const indices = Array.from({ length: qubitCount }, (_, index) => index);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const other = randomInt(i + 1, random);
+    [indices[i], indices[other]] = [indices[other], indices[i]];
   }
+  const activeCount = Math.min(qubitCount, 2 + Math.floor(level / 4));
+  indices.slice(0, activeCount).forEach((qubit) => {
+    const alternatives = STATES.filter((value) => value !== initial[qubit]);
+    internalTarget[qubit] = alternatives[randomInt(alternatives.length, random)];
+  });
+  const solution = internalTarget.flatMap((value, qubit) => shortestPath(initial[qubit], value, qubit));
+  const target = routeState(internalTarget, routing);
+  const crossings = countCrossings(routing);
 
   return {
     initial,
     target,
     solution,
     par: solution.length,
-    maxMoves: Math.min(7, solution.length + 2),
+    maxMoves: solution.length + 2,
     qubitCount,
+    routing,
+    crossings,
+    nexus: level >= 20 && level % 10 === 0,
   };
 }
 
@@ -114,6 +159,9 @@ export function tutorialPuzzle() {
     par: 3,
     maxMoves: 5,
     qubitCount: 2,
+    routing: [0, 1],
+    crossings: 0,
+    nexus: false,
     isTutorial: true,
   };
 }

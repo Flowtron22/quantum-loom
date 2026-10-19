@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
-import { GATES, generatePuzzle, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
+import { GATES, generatePuzzle, rankSolution, routeState, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
 const els = {
   canvas: document.querySelector("#scene"),
@@ -30,10 +30,12 @@ const els = {
   tutorialSkip: document.querySelector("#tutorial-skip"),
   physicsStatus: document.querySelector("#physics-status"),
   physicsStatusText: document.querySelector("#physics-status-text"),
+  routingStatus: document.querySelector("#routing-status"),
   shell: document.querySelector(".game-shell"),
 };
 
-let level = 1;
+const previewLevel = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get("sector")) : 0;
+let level = Math.max(1, previewLevel || Number(localStorage.getItem("quantum-loom-level") || 1));
 let streak = Number(localStorage.getItem("quantum-loom-streak") || 0);
 let puzzle;
 let placed = [];
@@ -88,7 +90,8 @@ const gateMachines = new THREE.Group();
 const pulseActors = new THREE.Group();
 const burstParticles = new THREE.Group();
 const targetChambers = new THREE.Group();
-loom.add(strands, nodes, particles, gateMachines, targetChambers, pulseActors, burstParticles);
+const junctions = new THREE.Group();
+loom.add(strands, nodes, particles, junctions, gateMachines, targetChambers, pulseActors, burstParticles);
 
 const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x151b26, metalness: 0.86, roughness: 0.26 });
 const railGeometry = new THREE.BoxGeometry(0.16, 6.8, 0.18);
@@ -131,14 +134,29 @@ function renderState(container, state) {
     .join("");
 }
 
-function makeWire(x, startY, endY, color) {
+function makeWireBetween(startX, startY, endX, endY, color, radius = 0.024) {
   const curve = new THREE.LineCurve3(
-    new THREE.Vector3(x, startY, 0),
-    new THREE.Vector3(x, endY, 0),
+    new THREE.Vector3(startX, startY, 0),
+    new THREE.Vector3(endX, endY, 0),
   );
-  const geometry = new THREE.TubeGeometry(curve, 12, 0.024, 6, false);
+  const geometry = new THREE.TubeGeometry(curve, 12, radius, 6, false);
   const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82, blending: THREE.AdditiveBlending });
   return new THREE.Mesh(geometry, material);
+}
+
+function makeRoutedWire(startX, endX, color, count, nexus = false) {
+  const group = new THREE.Group();
+  const radius = count >= 10 ? 0.012 : count >= 7 ? 0.017 : 0.024;
+  const shoulder = nexus ? 0.72 : 0.92;
+  group.add(makeWireBetween(startX, 2.85, startX, shoulder, color, radius));
+  if (nexus) {
+    group.add(makeWireBetween(startX, shoulder, 0, 0, color, radius));
+    group.add(makeWireBetween(0, 0, endX, -shoulder, color, radius));
+  } else {
+    group.add(makeWireBetween(startX, shoulder, endX, -shoulder, color, radius));
+  }
+  group.add(makeWireBetween(endX, -shoulder, endX, -2.85, color, radius));
+  return group;
 }
 
 function clearGroup(group) {
@@ -152,7 +170,8 @@ function clearGroup(group) {
 }
 
 function qubitXs(count) {
-  return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * 1.85);
+  const spacing = count <= 1 ? 0 : Math.min(1.85, 5.45 / (count - 1));
+  return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * spacing);
 }
 
 function gateY(index, total) {
@@ -199,6 +218,7 @@ function createGateMachine(gate, index, xs) {
   }
 
   group.position.set(xs[gate.qubit], gateY(index, placed.length), 0.22);
+  group.scale.setScalar(xs.length >= 10 ? 0.62 : xs.length >= 7 ? 0.78 : 1);
   group.userData = { gate, recoil: 0, baseY: group.position.y, baseScale: 1 };
   return group;
 }
@@ -209,8 +229,9 @@ function rebuildMachines(xs) {
   placed.forEach((gate, index) => gateMachines.add(createGateMachine(gate, index, xs)));
   puzzle.target.forEach((value, index) => {
     const color = stateColor(value);
+    const chamberRadius = xs.length >= 10 ? 0.105 : xs.length >= 7 ? 0.18 : 0.28;
     const chamber = new THREE.Mesh(
-      new THREE.TorusGeometry(0.28, 0.055, 8, 32),
+      new THREE.TorusGeometry(chamberRadius, chamberRadius * 0.2, 8, 32),
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2, metalness: 0.48, roughness: 0.2 }),
     );
     chamber.position.set(xs[index], -2.9, 0.16);
@@ -223,42 +244,43 @@ function rebuildLoom() {
   clearGroup(strands);
   clearGroup(nodes);
   clearGroup(particles);
+  clearGroup(junctions);
   const count = current.length;
   const xs = qubitXs(count);
-  const trace = traceCircuit(puzzle.initial, placed);
-  const levels = placed.map((_gate, index) => gateY(index, placed.length));
 
   current.forEach((value, index) => {
-    let segmentTop = 2.85;
-    const relevantGates = levels
-      .map((y, gateIndex) => ({ y, gateIndex, gate: placed[gateIndex] }))
-      .filter(({ gate }) => gate.qubit === index);
-    relevantGates.forEach(({ y, gateIndex }) => {
-      strands.add(makeWire(xs[index], segmentTop, y + 0.11, stateColor(trace[gateIndex][index])));
-      segmentTop = y - 0.11;
-    });
-    strands.add(makeWire(xs[index], segmentTop, -2.85, stateColor(trace.at(-1)[index])));
+    const exit = puzzle.routing[index];
+    strands.add(makeRoutedWire(xs[index], xs[exit], stateColor(value), count, puzzle.nexus));
 
     for (const y of [2.9, -2.9]) {
       const endpointValue = y > 0 ? puzzle.initial[index] : value;
       const color = stateColor(endpointValue);
       const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.25 });
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 20), material);
-      sphere.position.set(xs[index], y, 0.05);
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(count >= 10 ? 0.075 : 0.14, 20, 20), material);
+      sphere.position.set(y > 0 ? xs[index] : xs[exit], y, 0.05);
       nodes.add(sphere);
     }
 
-    for (let p = 0; p < 7; p += 1) {
+    for (let p = 0; p < (count >= 10 ? 2 : 5); p += 1) {
       const color = stateColor(value);
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.026 + Math.random() * 0.018, 8, 8),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
       );
-      dot.position.set(xs[index] + (Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 5.7, -0.2);
+      const particleY = (Math.random() - 0.5) * 5.7;
+      const routeProgress = Math.max(0, Math.min(1, (2.85 - particleY) / 5.7));
+      dot.position.set(THREE.MathUtils.lerp(xs[index], xs[exit], routeProgress) + (Math.random() - 0.5) * 0.1, particleY, -0.2);
       dot.userData.speed = 0.002 + Math.random() * 0.004;
       particles.add(dot);
     }
   });
+  if (puzzle.nexus) {
+    const core = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.22, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffcc58, emissive: 0xff4f94, emissiveIntensity: 4.2, metalness: 0.35, roughness: 0.12 }),
+    );
+    junctions.add(core);
+  }
   rebuildMachines(xs);
 }
 
@@ -272,7 +294,7 @@ function spawnPulseActors(state) {
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.5, roughness: 0.08 }),
     );
     actor.position.set(xs[qubit], 2.92, 0.5);
-    actor.userData = { qubit, state: value, baseX: xs[qubit] };
+    actor.userData = { qubit, state: value, startX: xs[qubit], endX: xs[puzzle.routing[qubit]] };
     pulseActors.add(actor);
   });
 }
@@ -395,12 +417,13 @@ function renderSlots() {
 
 function updateCircuit() {
   current = runCircuit(puzzle.initial, placed);
-  renderState(els.live, current);
+  const output = routeState(current, puzzle.routing);
+  renderState(els.live, output);
   renderSlots();
   els.moves.textContent = `${placed.length} / ${puzzle.maxMoves}`;
   els.undo.disabled = placed.length === 0;
   els.reset.disabled = placed.length === 0;
-  els.pulse.classList.toggle("ready", statesEqual(current, puzzle.target));
+  els.pulse.classList.toggle("ready", statesEqual(output, puzzle.target));
   rebuildLoom();
   updateTutorial();
 }
@@ -424,7 +447,7 @@ function removeGate(index) {
 
 function pulseCircuit() {
   if (simulation) return;
-  const success = statesEqual(current, puzzle.target);
+  const success = statesEqual(routeState(current, puzzle.routing), puzzle.target);
   simulation = {
     startedAt: clock.getElapsedTime(),
     duration: Math.max(1.65, placed.length * 0.34 + 0.92),
@@ -434,7 +457,7 @@ function pulseCircuit() {
     finished: false,
   };
   spawnPulseActors(puzzle.initial);
-  renderState(els.live, puzzle.initial);
+  renderState(els.live, routeState(puzzle.initial, puzzle.routing));
   els.physicsStatus.hidden = false;
   els.physicsStatus.className = "physics-status active";
   els.physicsStatusText.textContent = "ENERGY RELEASED";
@@ -446,7 +469,7 @@ function pulseCircuit() {
 function finishPhysicalRun() {
   if (!simulation || simulation.finished) return;
   simulation.finished = true;
-  renderState(els.live, current);
+  renderState(els.live, routeState(current, puzzle.routing));
   if (simulation.success) {
     els.physicsStatus.className = "physics-status active success";
     els.physicsStatusText.textContent = "TIMELINES STABILIZED";
@@ -492,7 +515,13 @@ function animatePhysicalRun(t) {
     actor.position.y = y;
     actor.rotation.x += 0.12;
     actor.rotation.y += 0.16;
-    actor.position.x = actor.userData.baseX;
+    if (puzzle.nexus) {
+      actor.position.x = progress < 0.5
+        ? THREE.MathUtils.lerp(actor.userData.startX, 0, progress * 2)
+        : THREE.MathUtils.lerp(0, actor.userData.endX, (progress - 0.5) * 2);
+    } else {
+      actor.position.x = THREE.MathUtils.lerp(actor.userData.startX, actor.userData.endX, eased);
+    }
   });
 
   const crossed = placed.reduce((count, _gate, index) => progress >= (index + 1) / (placed.length + 1) ? count + 1 : count, 0) - 1;
@@ -502,7 +531,7 @@ function animatePhysicalRun(t) {
     const gate = placed[index];
     const state = simulation.trace[index + 1];
     recolorPulseActors(state);
-    renderState(els.live, state);
+    renderState(els.live, routeState(state, puzzle.routing));
     const machine = gateMachines.children[index];
     if (machine) {
       machine.userData.recoil = 1;
@@ -547,6 +576,11 @@ function startLevel(forceTutorial = false) {
   els.level.textContent = String(level).padStart(2, "0");
   els.streak.textContent = streak;
   els.par.textContent = puzzle.par;
+  els.routingStatus.textContent = puzzle.nexus
+    ? `NEXUS · ${puzzle.qubitCount} STRANDS`
+    : puzzle.crossings
+      ? `${puzzle.crossings} CROSSINGS · ${puzzle.qubitCount} STRANDS`
+      : `DIRECT · ${puzzle.qubitCount} STRANDS`;
   renderState(els.target, puzzle.target);
   renderTray();
   updateCircuit();
@@ -577,9 +611,12 @@ function tone(frequency, duration) {
 els.pulse.addEventListener("click", pulseCircuit);
 els.undo.addEventListener("click", () => placed.length && removeGate(placed.length - 1));
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
-els.next.addEventListener("click", () => { level += 1; startLevel(); });
+els.next.addEventListener("click", () => {
+  level += 1;
+  localStorage.setItem("quantum-loom-level", String(level));
+  startLevel();
+});
 els.tutorialReplay.addEventListener("click", () => {
-  level = 1;
   els.result.classList.remove("visible");
   els.result.hidden = true;
   startLevel(true);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyGate, generatePuzzle, rankSolution, runCircuit, shortestPath, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
+import { applyGate, generatePuzzle, qubitCountForLevel, rankSolution, routeState, runCircuit, shortestPath, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
 test("gates transform basis and phase states", () => {
   assert.deepEqual(applyGate(["0", "+"], { type: "X", qubit: 0 }), ["1", "+"]);
@@ -8,24 +8,34 @@ test("gates transform basis and phase states", () => {
   assert.deepEqual(applyGate(["0", "+"], { type: "Z", qubit: 1 }), ["0", "-"]);
 });
 
-test("generated puzzles retain a valid solution", () => {
-  for (let level = 1; level <= 20; level += 1) {
+test("generated puzzles retain a valid routed solution", () => {
+  for (let level = 1; level <= 40; level += 1) {
     const puzzle = generatePuzzle(level, seeded(level));
-    assert.ok(statesEqual(runCircuit(puzzle.initial, puzzle.solution), puzzle.target));
-    assert.ok(!statesEqual(puzzle.initial, puzzle.target));
+    assert.ok(statesEqual(routeState(runCircuit(puzzle.initial, puzzle.solution), puzzle.routing), puzzle.target));
     assert.equal(puzzle.solution.length, puzzle.par);
+    assert.ok(puzzle.maxMoves >= puzzle.par);
   }
 });
 
 test("generated par is composed of shortest per-qubit paths", () => {
   for (let level = 1; level <= 20; level += 1) {
     const puzzle = generatePuzzle(level, seeded(level * 31));
-    const optimalLength = puzzle.target.reduce(
+    const internalTarget = Array(puzzle.qubitCount);
+    puzzle.routing.forEach((exit, source) => { internalTarget[source] = puzzle.target[exit]; });
+    const optimalLength = internalTarget.reduce(
       (total, value, qubit) => total + shortestPath(puzzle.initial[qubit], value, qubit).length,
       0,
     );
     assert.equal(puzzle.par, optimalLength);
   }
+});
+
+test("strand progression reaches dense endgame networks", () => {
+  assert.equal(qubitCountForLevel(1), 2);
+  assert.equal(qubitCountForLevel(6), 4);
+  assert.equal(qubitCountForLevel(23), 10);
+  assert.equal(qubitCountForLevel(30), 12);
+  assert.ok(generatePuzzle(6, seeded(6)).crossings > 0);
 });
 
 test("solution ranks reward par", () => {

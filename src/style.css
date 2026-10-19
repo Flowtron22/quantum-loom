@@ -44,6 +44,7 @@ button { font: inherit; }
   grid-template-rows: auto auto auto minmax(300px, 1fr) auto auto;
   gap: 10px;
 }
+.game-shell > * { min-width: 0; }
 
 .topbar, .objective-card, .gate-panel, .controls { position: relative; z-index: 3; }
 .topbar { grid-row: 1; }
@@ -70,8 +71,11 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
   background: linear-gradient(120deg, rgba(13, 25, 35, 0.94), rgba(9, 12, 19, 0.82));
   clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
 }
-.state-row { display: flex; gap: 6px; margin-top: 7px; }
+.objective-card > div:first-child { min-width: 0; overflow: hidden; }
+.state-row { display: flex; gap: 6px; margin-top: 7px; overflow-x: auto; scrollbar-width: none; }
+.state-row::-webkit-scrollbar { display: none; }
 .state-chip {
+  flex: 0 0 auto;
   min-width: 49px;
   padding: 5px 7px;
   border: 1px solid currentColor;
@@ -127,7 +131,9 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .loom-panel::after { right: 8%; bottom: 0; width: 30%; height: 2px; }
 #scene { display: block; width: 100%; height: 100%; touch-action: none; }
 .scanlines { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(126, 222, 255, 0.025) 4px); }
-.loom-hud { position: absolute; z-index: 3; top: 11px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; color: var(--muted); font: 700 8px "Space Mono", monospace; letter-spacing: 0.14em; }
+.loom-hud { position: absolute; z-index: 3; top: 11px; left: 12px; right: 12px; display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; align-items: flex-start; color: var(--muted); font: 700 8px "Space Mono", monospace; letter-spacing: 0.14em; }
+#routing-status { justify-self: end; color: var(--cyan); text-align: right; }
+.loom-hud .state-row { grid-column: 1 / -1; justify-self: end; max-width: 100%; }
 .physics-status { position: absolute; z-index: 6; top: 54px; left: 50%; min-width: 178px; padding: 8px 12px; border: 1px solid var(--cyan); color: var(--cyan); background: rgba(4, 10, 16, 0.88); text-align: center; transform: translateX(-50%); box-shadow: 0 0 24px rgba(73, 231, 255, 0.18); pointer-events: none; }
 .physics-status[hidden] { display: none; }
 .physics-status span { display: block; color: var(--muted); font: 700 7px "Space Mono", monospace; letter-spacing: 0.18em; }
@@ -136,8 +142,8 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .physics-status.success { color: var(--gold); border-color: var(--gold); box-shadow: 0 0 34px rgba(255, 204, 88, 0.3); }
 .physics-status.failure { color: var(--pink); border-color: var(--pink); box-shadow: 0 0 34px rgba(255, 49, 95, 0.3); }
 @keyframes status-enter { from { opacity: 0; transform: translate(-50%, -8px) scale(0.94); } }
-.slots { position: absolute; z-index: 4; left: 50%; bottom: 10px; width: min(92%, 420px); display: flex; gap: 6px; transform: translateX(-50%); }
-.slot { flex: 1; min-width: 0; height: 42px; padding: 2px; border: 1px solid rgba(118, 147, 162, 0.25); color: #3c5360; background: rgba(5, 8, 13, 0.82); cursor: pointer; }
+.slots { position: absolute; z-index: 4; left: 50%; bottom: 10px; width: min(92%, 420px); display: flex; gap: 6px; overflow-x: auto; transform: translateX(-50%); scrollbar-width: thin; scrollbar-color: var(--pink) rgba(5, 8, 13, 0.8); }
+.slot { flex: 0 0 48px; min-width: 0; height: 42px; padding: 2px; border: 1px solid rgba(118, 147, 162, 0.25); color: #3c5360; background: rgba(5, 8, 13, 0.88); cursor: pointer; }
 .slot b { display: block; font: 700 15px "Space Mono", monospace; }
 .slot sub, .gate sub { font-size: 8px; }
 .slot span { display: block; font: 7px "Space Mono", monospace; }
