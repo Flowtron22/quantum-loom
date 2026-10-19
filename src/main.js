@@ -153,20 +153,40 @@ function makeWireBetween(startX, startY, endX, endY, color, radius = 0.024) {
 const INPUT_Y = 2.85;
 const OUTPUT_Y = -2.28;
 
-function makeRoutedWire(startX, endX, color, count, nexus = false, laneOffset = 0) {
-  const group = new THREE.Group();
-  const radius = count >= 10 ? 0.012 : count >= 7 ? 0.017 : 0.024;
+function buildRoute(startX, endX, nexus = false, laneOffset = 0) {
   const shoulder = nexus ? 0.72 : 0.92;
   const routedStart = startX + laneOffset;
   const routedEnd = endX + laneOffset;
-  group.add(makeWireBetween(startX, INPUT_Y, routedStart, shoulder, color, radius));
+  const points = [new THREE.Vector3(startX, INPUT_Y, 0), new THREE.Vector3(routedStart, shoulder, 0)];
   if (nexus) {
-    group.add(makeWireBetween(routedStart, shoulder, laneOffset * 0.35, 0, color, radius));
-    group.add(makeWireBetween(laneOffset * 0.35, 0, routedEnd, -shoulder, color, radius));
-  } else {
-    group.add(makeWireBetween(routedStart, shoulder, routedEnd, -shoulder, color, radius));
+    points.push(new THREE.Vector3(laneOffset * 0.35, 0, 0));
   }
-  group.add(makeWireBetween(routedEnd, -shoulder, endX, OUTPUT_Y, color, radius));
+  points.push(new THREE.Vector3(routedEnd, -shoulder, 0), new THREE.Vector3(endX, OUTPUT_Y, 0));
+  const lengths = points.slice(1).map((point, index) => point.distanceTo(points[index]));
+  return { points, lengths, total: lengths.reduce((sum, length) => sum + length, 0) };
+}
+
+function sampleRoute(route, progress, target = new THREE.Vector3()) {
+  let distance = Math.max(0, Math.min(1, progress)) * route.total;
+  for (let index = 0; index < route.lengths.length; index += 1) {
+    const length = route.lengths[index];
+    if (distance <= length || index === route.lengths.length - 1) {
+      return target.lerpVectors(route.points[index], route.points[index + 1], Math.min(1, distance / length));
+    }
+    distance -= length;
+  }
+  return target.copy(route.points.at(-1));
+}
+
+function makeRoutedWire(startX, endX, color, count, nexus = false, laneOffset = 0) {
+  const group = new THREE.Group();
+  const radius = count >= 10 ? 0.012 : count >= 7 ? 0.017 : 0.024;
+  const route = buildRoute(startX, endX, nexus, laneOffset);
+  for (let index = 0; index < route.points.length - 1; index += 1) {
+    const start = route.points[index];
+    const end = route.points[index + 1];
+    group.add(makeWireBetween(start.x, start.y, end.x, end.y, color, radius));
+  }
   return group;
 }
 
@@ -284,10 +304,12 @@ function rebuildLoom() {
         new THREE.SphereGeometry(0.026 + Math.random() * 0.018, 8, 8),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
       );
-      const particleY = OUTPUT_Y + Math.random() * (INPUT_Y - OUTPUT_Y);
-      const routeProgress = Math.max(0, Math.min(1, (INPUT_Y - particleY) / (INPUT_Y - OUTPUT_Y)));
-      dot.position.set(THREE.MathUtils.lerp(xs[index], xs[exit], routeProgress) + (Math.random() - 0.5) * 0.1, particleY, -0.2);
-      dot.userData.speed = 0.002 + Math.random() * 0.004;
+      const laneOffset = value === "+" || value === "-" ? (p % 2 ? -1 : 1) * (count >= 7 ? 0.035 : 0.065) : 0;
+      dot.userData.route = buildRoute(xs[index], xs[exit], puzzle.nexus, laneOffset);
+      dot.userData.progress = Math.random();
+      dot.userData.speed = 0.0012 + Math.random() * 0.0018;
+      sampleRoute(dot.userData.route, dot.userData.progress, dot.position);
+      dot.position.z = -0.2;
       particles.add(dot);
     }
   });
@@ -310,8 +332,13 @@ function spawnPulseActors(state) {
       new THREE.IcosahedronGeometry(0.19, 2),
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.5, roughness: 0.08 }),
     );
-    actor.position.set(xs[qubit], 2.92, 0.5);
-    actor.userData = { qubit, state: value, startX: xs[qubit], endX: xs[puzzle.routing[qubit]] };
+    actor.userData = {
+      qubit,
+      state: value,
+      route: buildRoute(xs[qubit], xs[puzzle.routing[qubit]], puzzle.nexus),
+    };
+    sampleRoute(actor.userData.route, 0, actor.position);
+    actor.position.z = 0.5;
     pulseActors.add(actor);
   });
 }
@@ -544,18 +571,11 @@ function animatePhysicalRun(t) {
   if (!simulation) return;
   const progress = Math.min(1, (t - simulation.startedAt) / simulation.duration);
   const eased = progress * progress * (3 - 2 * progress);
-  const y = 2.92 - eased * (2.92 - OUTPUT_Y);
   pulseActors.children.forEach((actor, index) => {
-    actor.position.y = y;
+    sampleRoute(actor.userData.route, eased, actor.position);
+    actor.position.z = 0.5;
     actor.rotation.x += 0.12;
     actor.rotation.y += 0.16;
-    if (puzzle.nexus) {
-      actor.position.x = progress < 0.5
-        ? THREE.MathUtils.lerp(actor.userData.startX, 0, progress * 2)
-        : THREE.MathUtils.lerp(0, actor.userData.endX, (progress - 0.5) * 2);
-    } else {
-      actor.position.x = THREE.MathUtils.lerp(actor.userData.startX, actor.userData.endX, eased);
-    }
   });
 
   const crossed = placed.reduce((count, _gate, index) => progress >= (index + 1) / (placed.length + 1) ? count + 1 : count, 0) - 1;
@@ -687,8 +707,9 @@ function animate() {
     node.scale.setScalar(scale);
   });
   particles.children.forEach((dot) => {
-    dot.position.y -= dot.userData.speed * 12;
-    if (dot.position.y < OUTPUT_Y) dot.position.y = 2.9;
+    dot.userData.progress = (dot.userData.progress + dot.userData.speed) % 1;
+    sampleRoute(dot.userData.route, dot.userData.progress, dot.position);
+    dot.position.z = -0.2;
   });
   gateMachines.children.forEach((machine, index) => {
     machine.userData.recoil *= 0.82;
