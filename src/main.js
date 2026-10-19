@@ -205,10 +205,6 @@ function qubitXs(count) {
   return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * spacing);
 }
 
-function gateY(index, total) {
-  return total <= 1 ? 0 : 2.05 - index * (4.1 / Math.max(1, total - 1));
-}
-
 function createGateMachine(gate, index, xs) {
   const color = GATES[gate.type].color;
   const group = new THREE.Group();
@@ -248,7 +244,9 @@ function createGateMachine(gate, index, xs) {
     group.add(wave);
   }
 
-  group.position.set(xs[gate.qubit], gateY(index, placed.length), 0.22);
+  const route = buildRoute(xs[gate.qubit], xs[puzzle.routing[gate.qubit]], puzzle.nexus);
+  sampleRoute(route, (index + 1) / (placed.length + 1), group.position);
+  group.position.z = 0.22;
   group.scale.setScalar(xs.length >= 10 ? 0.62 : xs.length >= 7 ? 0.78 : 1);
   group.userData = { gate, recoil: 0, baseY: group.position.y, baseScale: 1 };
   return group;
