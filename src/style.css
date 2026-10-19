@@ -57,11 +57,21 @@ button { font: inherit; }
 .controls { grid-row: 6; }
 .topbar { display: flex; align-items: center; justify-content: space-between; }
 .eyebrow, .micro-label { margin: 0; color: var(--cyan); font: 700 10px/1.2 "Space Mono", monospace; letter-spacing: 0.22em; }
-h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em; line-height: 1; }
+.brand-lockup { min-width: 0; }
+.brand-byline { margin: 2px 0 0; color: var(--muted); font: 700 6px/1 "Space Mono", monospace; letter-spacing: 0.14em; white-space: nowrap; }
+h1 { margin: 2px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em; line-height: 1; }
 .run-stats { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 700 9px "Space Mono", monospace; letter-spacing: 0.08em; }
 .run-stats strong { color: var(--text); font-size: 14px; }
 .icon-button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; color: var(--cyan); background: #0a1018; cursor: pointer; }
 .help-button { color: var(--gold); border-color: rgba(255, 204, 88, 0.32); font: 700 14px "Space Mono", monospace; }
+
+@media (max-width: 350px) {
+  .topbar { gap: 7px; }
+  .eyebrow { font-size: 8px; letter-spacing: 0.17em; }
+  .brand-byline { font-size: 5px; }
+  .run-stats { gap: 6px; font-size: 8px; }
+  .icon-button { width: 32px; height: 32px; }
+}
 
 .objective-card {
   min-height: 70px;
