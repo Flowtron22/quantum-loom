@@ -155,16 +155,17 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .gate-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 9px; }
 .gate-panel-heading p:last-child { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
 .gate-panel-heading > span { color: var(--muted); font: 700 10px "Space Mono", monospace; }
-.gate-tray { display: grid; gap: 6px; }
-.gate-bank { min-width: 0; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 7px; align-items: stretch; }
-.gate-bank-label { display: grid; place-items: center; align-content: center; border: 1px solid currentColor; color: var(--cyan); background: rgba(73, 231, 255, 0.04); text-align: center; }
-.gate-bank-label strong { font: 700 18px/1 "Space Mono", monospace; }
-.gate-bank-label span { margin-top: 4px; font: 700 6px/1 "Space Mono", monospace; letter-spacing: 0.06em; }
-.gate-bank-h .gate-bank-label { color: var(--gold); background: rgba(255, 204, 88, 0.04); }
-.gate-bank-z .gate-bank-label { color: var(--pink); background: rgba(255, 79, 148, 0.04); }
-.gate-row { min-width: 0; display: flex; gap: 7px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: currentColor rgba(5, 8, 13, 0.8); }
-.gate-row::after { content: ""; flex: 0 0 1px; }
-.gate { flex: 0 0 70px; height: 50px; padding: 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--cyan); background: rgba(73, 231, 255, 0.07); cursor: grab; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.gate-tray { display: grid; gap: 8px; }
+.gate-bank { min-width: 0; display: grid; gap: 4px; }
+.gate-bank-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--cyan); }
+.gate-bank-label span { font: 700 7px/1 "Space Mono", monospace; letter-spacing: 0.1em; }
+.gate-bank-label strong { margin-right: 5px; font-size: 11px; }
+.gate-bank-label em { color: var(--muted); font: normal 7px/1 "Space Mono", monospace; letter-spacing: 0.04em; }
+.gate-bank-h .gate-bank-label { color: var(--gold); }
+.gate-bank-z .gate-bank-label { color: var(--pink); }
+.gate-row { min-width: 0; display: grid; grid-template-columns: repeat(var(--qubits), minmax(64px, 1fr)); gap: 7px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: currentColor rgba(5, 8, 13, 0.8); }
+.gate-row:has(.gate:nth-child(8)) { grid-template-columns: repeat(var(--qubits), 64px); }
+.gate { width: 100%; min-width: 0; height: 46px; padding: 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--cyan); background: rgba(73, 231, 255, 0.07); cursor: grab; transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .gate:active { cursor: grabbing; transform: translateY(1px) scale(0.98); }
 .gate:hover { box-shadow: 0 0 18px color-mix(in srgb, currentColor 24%, transparent); }
 .gate.hinted { animation: gate-hint 1.15s ease-in-out infinite; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.82), 0 0 24px currentColor; }

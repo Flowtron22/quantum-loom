@@ -65,6 +65,12 @@ const tutorialPrompts = [
   },
 ];
 
+const gatePhysics = {
+  X: { equation: "|0〉 ↔ |1〉", action: "BASIS PATH SWAPPED" },
+  H: { equation: "split ±0.707", action: "AMPLITUDE SPLIT ±0.707" },
+  Z: { equation: "+ ↔ − phase", action: "PHASE SIGN FLIPPED" },
+};
+
 const renderer = new THREE.WebGLRenderer({ canvas: els.canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -144,18 +150,23 @@ function makeWireBetween(startX, startY, endX, endY, color, radius = 0.024) {
   return new THREE.Mesh(geometry, material);
 }
 
-function makeRoutedWire(startX, endX, color, count, nexus = false) {
+const INPUT_Y = 2.85;
+const OUTPUT_Y = -2.28;
+
+function makeRoutedWire(startX, endX, color, count, nexus = false, laneOffset = 0) {
   const group = new THREE.Group();
   const radius = count >= 10 ? 0.012 : count >= 7 ? 0.017 : 0.024;
   const shoulder = nexus ? 0.72 : 0.92;
-  group.add(makeWireBetween(startX, 2.85, startX, shoulder, color, radius));
+  const routedStart = startX + laneOffset;
+  const routedEnd = endX + laneOffset;
+  group.add(makeWireBetween(startX, INPUT_Y, routedStart, shoulder, color, radius));
   if (nexus) {
-    group.add(makeWireBetween(startX, shoulder, 0, 0, color, radius));
-    group.add(makeWireBetween(0, 0, endX, -shoulder, color, radius));
+    group.add(makeWireBetween(routedStart, shoulder, laneOffset * 0.35, 0, color, radius));
+    group.add(makeWireBetween(laneOffset * 0.35, 0, routedEnd, -shoulder, color, radius));
   } else {
-    group.add(makeWireBetween(startX, shoulder, endX, -shoulder, color, radius));
+    group.add(makeWireBetween(routedStart, shoulder, routedEnd, -shoulder, color, radius));
   }
-  group.add(makeWireBetween(endX, -shoulder, endX, -2.85, color, radius));
+  group.add(makeWireBetween(routedEnd, -shoulder, endX, OUTPUT_Y, color, radius));
   return group;
 }
 
@@ -234,7 +245,7 @@ function rebuildMachines(xs) {
       new THREE.TorusGeometry(chamberRadius, chamberRadius * 0.2, 8, 32),
       new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2, metalness: 0.48, roughness: 0.2 }),
     );
-    chamber.position.set(xs[index], -2.9, 0.16);
+    chamber.position.set(xs[index], OUTPUT_Y, 0.16);
     chamber.userData.baseScale = 1;
     targetChambers.add(chamber);
   });
@@ -250,9 +261,15 @@ function rebuildLoom() {
 
   current.forEach((value, index) => {
     const exit = puzzle.routing[index];
-    strands.add(makeRoutedWire(xs[index], xs[exit], stateColor(value), count, puzzle.nexus));
+    if (value === "+" || value === "-") {
+      const separation = count >= 7 ? 0.035 : 0.065;
+      strands.add(makeRoutedWire(xs[index], xs[exit], 0x49e7ff, count, puzzle.nexus, -separation));
+      strands.add(makeRoutedWire(xs[index], xs[exit], value === "+" ? 0xffcc58 : 0xa77cff, count, puzzle.nexus, separation));
+    } else {
+      strands.add(makeRoutedWire(xs[index], xs[exit], stateColor(value), count, puzzle.nexus));
+    }
 
-    for (const y of [2.9, -2.9]) {
+    for (const y of [2.9, OUTPUT_Y]) {
       const endpointValue = y > 0 ? puzzle.initial[index] : value;
       const color = stateColor(endpointValue);
       const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.8, roughness: 0.25 });
@@ -267,8 +284,8 @@ function rebuildLoom() {
         new THREE.SphereGeometry(0.026 + Math.random() * 0.018, 8, 8),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }),
       );
-      const particleY = (Math.random() - 0.5) * 5.7;
-      const routeProgress = Math.max(0, Math.min(1, (2.85 - particleY) / 5.7));
+      const particleY = OUTPUT_Y + Math.random() * (INPUT_Y - OUTPUT_Y);
+      const routeProgress = Math.max(0, Math.min(1, (INPUT_Y - particleY) / (INPUT_Y - OUTPUT_Y)));
       dot.position.set(THREE.MathUtils.lerp(xs[index], xs[exit], routeProgress) + (Math.random() - 0.5) * 0.1, particleY, -0.2);
       dot.userData.speed = 0.002 + Math.random() * 0.004;
       particles.add(dot);
@@ -362,9 +379,10 @@ function renderTray() {
     bank.setAttribute("aria-label", `${def.name} gates`);
     const label = document.createElement("div");
     label.className = "gate-bank-label";
-    label.innerHTML = `<strong>${def.short}</strong><span>${def.name}</span>`;
+    label.innerHTML = `<span><strong>${def.short}</strong>${def.name}</span><em>${gatePhysics[type].equation}</em>`;
     const row = document.createElement("div");
     row.className = "gate-row";
+    row.style.setProperty("--qubits", puzzle.qubitCount);
     for (let q = 0; q < puzzle.qubitCount; q += 1) row.appendChild(makeGateButton(type, q));
     bank.append(label, row);
     els.tray.appendChild(bank);
@@ -415,6 +433,11 @@ function renderSlots() {
       : `<b>+</b><span>${i + 1}</span>`;
     slot.setAttribute("aria-label", placed[i] ? `Remove ${placed[i].type} gate from slot ${i + 1}` : `Empty gate slot ${i + 1}`);
     slot.addEventListener("click", () => placed[i] && removeGate(i));
+    slot.addEventListener("contextmenu", (event) => {
+      if (!placed[i]) return;
+      event.preventDefault();
+      removeGate(i);
+    });
     slot.addEventListener("dragover", (event) => event.preventDefault());
     slot.addEventListener("drop", (event) => {
       event.preventDefault();
@@ -521,7 +544,7 @@ function animatePhysicalRun(t) {
   if (!simulation) return;
   const progress = Math.min(1, (t - simulation.startedAt) / simulation.duration);
   const eased = progress * progress * (3 - 2 * progress);
-  const y = 2.92 - eased * 5.82;
+  const y = 2.92 - eased * (2.92 - OUTPUT_Y);
   pulseActors.children.forEach((actor, index) => {
     actor.position.y = y;
     actor.rotation.x += 0.12;
@@ -548,7 +571,7 @@ function animatePhysicalRun(t) {
       machine.userData.recoil = 1;
       emitBurst(machine.position, GATES[gate.type].color, gate.type === "H" ? 22 : 14, 0.75);
     }
-    els.physicsStatusText.textContent = `${GATES[gate.type].name} q${gate.qubit}`;
+    els.physicsStatusText.textContent = `${gatePhysics[gate.type].action} · q${gate.qubit}`;
     tone(240 + index * 70 + gate.qubit * 45, 0.09);
   }
   if (progress >= 1) finishPhysicalRun();
@@ -665,7 +688,7 @@ function animate() {
   });
   particles.children.forEach((dot) => {
     dot.position.y -= dot.userData.speed * 12;
-    if (dot.position.y < -2.9) dot.position.y = 2.9;
+    if (dot.position.y < OUTPUT_Y) dot.position.y = 2.9;
   });
   gateMachines.children.forEach((machine, index) => {
     machine.userData.recoil *= 0.82;
