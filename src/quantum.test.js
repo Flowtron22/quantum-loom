@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyGate, basisState, generatePuzzle, isNormalized, qubitCountForLevel, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
+import { applyGate, basisState, curriculumPuzzle, generatePuzzle, isNormalized, qubitCountForLevel, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
 test("X permutes computational basis lanes", () => {
   assert.ok(statesEqual(applyGate(basisState(2, 0), { type: "X", qubit: 0 }, 2), basisState(2, 2)));
@@ -37,9 +37,21 @@ test("generated puzzles have normalized reachable targets", () => {
 
 test("progression reaches sixteen basis lanes", () => {
   assert.equal(qubitCountForLevel(1), 1);
-  assert.equal(qubitCountForLevel(3), 2);
-  assert.equal(qubitCountForLevel(7), 3);
-  assert.equal(qubitCountForLevel(12), 4);
+  assert.equal(qubitCountForLevel(6), 2);
+  assert.equal(qubitCountForLevel(14), 3);
+  assert.equal(qubitCountForLevel(20), 4);
+});
+
+test("nine-lesson curriculum introduces one concept at a time", () => {
+  for (let level = 1; level <= 9; level += 1) {
+    const lesson = curriculumPuzzle(level);
+    assert.ok(lesson.isLesson);
+    assert.equal(lesson.lesson.number, level);
+    assert.equal(lesson.lesson.steps.length, lesson.solution.length + 1);
+    assert.ok(statesEqual(runCircuit(lesson.initial, lesson.solution, lesson.qubitCount), lesson.target));
+  }
+  assert.deepEqual(curriculumPuzzle(8).solution.map(({ type }) => type), ["H", "Z", "H"]);
+  assert.equal(curriculumPuzzle(9).laneCount, 4);
 });
 
 test("tutorial and traces expose every state-vector step", () => {

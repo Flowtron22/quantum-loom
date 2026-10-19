@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
-import { GATES, amplitudeMagnitude, basisLabel, generatePuzzle, gateMapIndex, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
+import { GATES, amplitudeMagnitude, basisLabel, generatePuzzle, gateMapIndex, rankSolution, runCircuit, statesEqual, traceCircuit } from "./quantum.js";
 
 const els = Object.fromEntries([
   ["canvas", "#scene"], ["level", "#level"], ["streak", "#streak"], ["par", "#par"],
@@ -15,6 +15,13 @@ const els = Object.fromEntries([
 ].map(([key, selector]) => [key, document.querySelector(selector)]));
 
 const previewLevel = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get("sector")) : 0;
+const curriculumVersion = "1";
+if (!previewLevel && localStorage.getItem("quantum-loom-curriculum-version") !== curriculumVersion) {
+  const previousLevel = Number(localStorage.getItem("quantum-loom-level") || 1);
+  if (previousLevel > 1) localStorage.setItem("quantum-loom-pre-curriculum-level", String(previousLevel));
+  localStorage.setItem("quantum-loom-level", "1");
+  localStorage.setItem("quantum-loom-curriculum-version", curriculumVersion);
+}
 let level = Math.max(1, previewLevel || Number(localStorage.getItem("quantum-loom-level") || 1));
 let streak = Number(localStorage.getItem("quantum-loom-streak") || 0);
 let puzzle;
@@ -233,8 +240,7 @@ function makeGateButton(gate) {
 
 function renderTray() {
   els.tray.innerHTML = "";
-  const banks = ["X", "H", "Z"];
-  if (puzzle.includeControl) banks.push("CX");
+  const banks = puzzle.availableTypes || (puzzle.includeControl ? ["X", "H", "Z", "CX"] : ["X", "H", "Z"]);
   banks.forEach((type) => {
     const gates = [];
     if (type === "CX") {
@@ -278,17 +284,23 @@ function updateTutorial() {
   els.tray.querySelectorAll(".gate").forEach((button) => button.classList.remove("hinted"));
   els.pulse.classList.remove("tutorial-hint");
   if (!tutorialActive) return;
-  const correct = placed.length === 0 || (placed.length === 1 && placed[0].type === "X" && placed[0].qubit === 0);
-  const ready = correct && placed.length === 1;
-  els.tutorialStep.textContent = ready ? "2 / 2" : "1 / 2";
-  els.tutorialTitle.textContent = ready ? "Pulse the state vector" : correct ? "Swap the basis lanes" : "Undo the last gate";
-  els.tutorialCopy.textContent = ready
-    ? "The amplitude moved from |0〉 to the target lane |1〉. Pulse the circuit to stabilize it."
-    : correct
-      ? "Tap X₀. X exchanges the |0〉 and |1〉 basis lanes; applying X twice would reverse it."
-      : "That operation does not match this training circuit. Undo it and select X₀.";
-  if (ready) els.pulse.classList.add("tutorial-hint");
-  else if (correct) els.tray.querySelector('[data-type="X"][data-qubit="0"]')?.classList.add("hinted");
+  const lesson = puzzle.lesson;
+  const correct = placed.every((gate, index) => {
+    const expected = puzzle.solution[index];
+    return expected && gate.type === expected.type && gate.qubit === expected.qubit && gate.control === expected.control;
+  });
+  const step = correct ? Math.min(placed.length, puzzle.solution.length) : Math.max(0, placed.length - 1);
+  const ready = correct && step === puzzle.solution.length;
+  els.tutorialStep.textContent = `${step + 1} / ${lesson.steps.length}`;
+  els.tutorialTitle.textContent = correct ? lesson.title : "Undo the last gate";
+  els.tutorialCopy.textContent = correct ? lesson.steps[step] : "That operation changes a different part of the state vector. Undo it and follow the glowing gate.";
+  if (ready) {
+    els.pulse.classList.add("tutorial-hint");
+  } else if (correct) {
+    const expected = puzzle.solution[step];
+    const selector = `[data-type="${expected.type}"][data-qubit="${expected.qubit}"]${expected.control === undefined ? "" : `[data-control="${expected.control}"]`}`;
+    els.tray.querySelector(selector)?.classList.add("hinted");
+  }
 }
 
 function updateCircuit() {
@@ -434,9 +446,9 @@ function showResult() {
   els.resultGates.textContent = placed.length;
   els.resultPar.textContent = puzzle.par;
   if (tutorialActive) {
-    localStorage.setItem("quantum-loom-statevector-tutorial", "complete");
+    localStorage.setItem(`quantum-loom-lesson-${level}`, "complete");
     tutorialActive = false;
-    els.resultCopy.textContent = "Training complete. You moved a real amplitude between basis lanes.";
+    els.resultCopy.textContent = puzzle.lesson ? `${puzzle.lesson.title} complete. The next sector introduces one more idea.` : "Training complete.";
   } else {
     els.resultCopy.textContent = rank === "S" ? "Optimal state-vector alignment." : rank === "A" ? "Stable circuit. One step from par." : "Aligned, but the algorithm can be shorter.";
   }
@@ -450,8 +462,8 @@ function startLevel(forceTutorial = false) {
   els.physicsStatus.hidden = true;
   els.pulse.textContent = "PULSE CIRCUIT";
   setControlsLocked(false);
-  tutorialActive = forceTutorial || (level === 1 && localStorage.getItem("quantum-loom-statevector-tutorial") !== "complete");
-  puzzle = tutorialActive ? tutorialPuzzle() : generatePuzzle(level);
+  puzzle = generatePuzzle(level);
+  tutorialActive = Boolean(puzzle.isLesson && (forceTutorial || localStorage.getItem(`quantum-loom-lesson-${level}`) !== "skipped"));
   placed = [];
   current = puzzle.initial.map((amplitude) => ({ ...amplitude }));
   els.level.textContent = String(level).padStart(2, "0");
@@ -480,7 +492,7 @@ els.undo.addEventListener("click", () => placed.length && removeGate(placed.leng
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
 els.next.addEventListener("click", () => { level += 1; localStorage.setItem("quantum-loom-level", String(level)); startLevel(); });
 els.tutorialReplay.addEventListener("click", () => { els.result.classList.remove("visible"); els.result.hidden = true; startLevel(true); });
-els.tutorialSkip.addEventListener("click", () => { tutorialActive = false; localStorage.setItem("quantum-loom-statevector-tutorial", "complete"); updateTutorial(); });
+els.tutorialSkip.addEventListener("click", () => { tutorialActive = false; localStorage.setItem(`quantum-loom-lesson-${level}`, "skipped"); updateTutorial(); });
 els.sound.addEventListener("click", () => { soundOn = !soundOn; els.sound.textContent = soundOn ? "◉" : "○"; });
 
 function resize() {

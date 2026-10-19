@@ -9,9 +9,9 @@ export const GATES = {
 };
 
 export function qubitCountForLevel(level) {
-  if (level < 3) return 1;
-  if (level < 7) return 2;
-  if (level < 12) return 3;
+  if (level < 6) return 1;
+  if (level < 14) return 2;
+  if (level < 20) return 3;
   return 4;
 }
 
@@ -149,7 +149,84 @@ function createSolution(level, qubitCount, random) {
   return solution;
 }
 
+function lessonState(initial, gates, qubitCount) {
+  return runCircuit(initial, gates, qubitCount);
+}
+
+function makeLesson(level, { qubitCount, initial, solution, availableTypes, title, steps }) {
+  return {
+    initial,
+    target: lessonState(initial, solution, qubitCount),
+    solution,
+    par: solution.length,
+    maxMoves: solution.length + 2,
+    qubitCount,
+    laneCount: 2 ** qubitCount,
+    includeControl: availableTypes.includes("CX"),
+    availableTypes,
+    isLesson: true,
+    lesson: { number: level, total: 9, title, steps },
+  };
+}
+
+export function curriculumPuzzle(level) {
+  const lessons = {
+    1: {
+      qubitCount: 1, initial: basisState(1, 0), solution: [{ type: "X", qubit: 0 }], availableTypes: ["X"],
+      title: "Move an amplitude",
+      steps: ["The sigil begins on |0〉. Tap X₀ to exchange the |0〉 and |1〉 lanes.", "The output now matches |1〉. Pulse the circuit."],
+    },
+    2: {
+      qubitCount: 1, initial: basisState(1, 1), solution: [{ type: "X", qubit: 0 }], availableTypes: ["X"],
+      title: "X is reversible",
+      steps: ["X works both ways. Tap X₀ to move the sigil from |1〉 back to |0〉.", "One X reversed the bit flip. Pulse the circuit."],
+    },
+    3: {
+      qubitCount: 1, initial: basisState(1, 0), solution: [{ type: "H", qubit: 0 }], availableTypes: ["X", "H"],
+      title: "Split the sigil",
+      steps: ["Tap H₀. It divides one amplitude into two equal 0.71 waves.", "Both lanes now carry 50% probability. Pulse the circuit."],
+    },
+    4: {
+      qubitCount: 1, initial: basisState(1, 1), solution: [{ type: "H", qubit: 0 }], availableTypes: ["H"],
+      title: "Meet negative amplitude",
+      steps: ["H on |1〉 creates +0.71 on |0〉 and −0.71 on |1〉. Tap H₀.", "Purple means negative amplitude—not negative probability. Pulse the circuit."],
+    },
+    5: {
+      qubitCount: 1,
+      initial: lessonState(basisState(1, 0), [{ type: "H", qubit: 0 }], 1),
+      solution: [{ type: "Z", qubit: 0 }], availableTypes: ["H", "Z"],
+      title: "Flip the phase",
+      steps: ["The two lanes start positive. Tap Z₀ to reverse only the |1〉 amplitude.", "Z changed phase without moving probability. Pulse the circuit."],
+    },
+    6: {
+      qubitCount: 2, initial: basisState(2, 0), solution: [{ type: "X", qubit: 0 }], availableTypes: ["X"],
+      title: "Four basis lanes",
+      steps: ["Two qubits create |00〉, |01〉, |10〉, and |11〉. Tap X₀ to exchange the first-bit pairs.", "The sigil moved from |00〉 to |10〉. Pulse the circuit."],
+    },
+    7: {
+      qubitCount: 2, initial: basisState(2, 2), solution: [{ type: "CX", control: 0, qubit: 1 }], availableTypes: ["X", "CX"],
+      title: "Conditional control",
+      steps: ["The first bit of |10〉 is 1, so C₀→X₁ may flip the second bit. Tap it.", "The control condition passed, moving |10〉 to |11〉. Pulse the circuit."],
+    },
+    8: {
+      qubitCount: 1, initial: basisState(1, 0),
+      solution: [{ type: "H", qubit: 0 }, { type: "Z", qubit: 0 }, { type: "H", qubit: 0 }],
+      availableTypes: ["H", "Z"], title: "Interference",
+      steps: ["Tap H₀ to split the wave.", "Tap Z₀ to reverse one branch.", "Tap H₀ again. The branches recombine and cancel on |0〉.", "Only |1〉 remains. Pulse the circuit."],
+    },
+    9: {
+      qubitCount: 2, initial: basisState(2, 0),
+      solution: [{ type: "H", qubit: 0 }, { type: "CX", control: 0, qubit: 1 }],
+      availableTypes: ["H", "CX"], title: "Entangle two qubits",
+      steps: ["Tap H₀ to split |00〉 between |00〉 and |10〉.", "Tap C₀→X₁. Only the branch whose control bit is 1 flips.", "The result links |00〉 with |11〉. Pulse the circuit."],
+    },
+  };
+  return lessons[level] ? makeLesson(level, lessons[level]) : null;
+}
+
 export function generatePuzzle(level = 1, random = Math.random) {
+  const lesson = curriculumPuzzle(level);
+  if (lesson) return lesson;
   const qubitCount = qubitCountForLevel(level);
   const initial = basisState(qubitCount, randomInt(2 ** qubitCount, random));
   let solution;
@@ -166,22 +243,13 @@ export function generatePuzzle(level = 1, random = Math.random) {
     maxMoves: solution.length + 2,
     qubitCount,
     laneCount: 2 ** qubitCount,
-    includeControl: level >= 5,
+    includeControl: level >= 10,
+    availableTypes: ["X", "H", "Z", "CX"],
   };
 }
 
 export function tutorialPuzzle() {
-  return {
-    initial: basisState(1, 0),
-    target: basisState(1, 1),
-    solution: [{ type: "X", qubit: 0 }],
-    par: 1,
-    maxMoves: 3,
-    qubitCount: 1,
-    laneCount: 2,
-    includeControl: false,
-    isTutorial: true,
-  };
+  return curriculumPuzzle(1);
 }
 
 export function rankSolution(moves, par) {
