@@ -40,6 +40,7 @@ let puzzle;
 let placed = [];
 let current = [];
 let tutorialActive = false;
+let helpOpen = false;
 let simulation = null;
 let soundOn = true;
 let audioContext;
@@ -292,9 +293,16 @@ function renderSlots() {
 }
 
 function updateTutorial() {
-  els.tutorialCoach.hidden = !tutorialActive;
+  els.tutorialCoach.hidden = !(tutorialActive || helpOpen);
   els.tray.querySelectorAll(".gate").forEach((button) => button.classList.remove("hinted"));
   els.pulse.classList.remove("tutorial-hint");
+  els.tutorialSkip.textContent = helpOpen && !tutorialActive ? "CLOSE" : "SKIP";
+  if (helpOpen && !tutorialActive) {
+    els.tutorialStep.textContent = "GUIDE";
+    els.tutorialTitle.textContent = "Quantum Mode Reference";
+    els.tutorialCopy.textContent = "X moves amplitudes, H splits and recombines them, Z changes relative phase, and C·X flips a target only when its control is 1. Match every target amplitude, then pulse.";
+    return;
+  }
   if (!tutorialActive) return;
   const lesson = puzzle.lesson;
   const correct = placed.every((gate, index) => {
@@ -470,6 +478,7 @@ function showResult() {
 
 function startLevel(forceTutorial = false) {
   simulation = null;
+  helpOpen = false;
   clearGroup(pulseActors); clearGroup(bursts);
   els.physicsStatus.hidden = true;
   els.pulse.textContent = "PULSE CIRCUIT";
@@ -503,8 +512,24 @@ els.pulse.addEventListener("click", pulseCircuit);
 els.undo.addEventListener("click", () => placed.length && removeGate(placed.length - 1));
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
 els.next.addEventListener("click", () => { level += 1; localStorage.setItem(quantumLevelKey, String(level)); startLevel(); });
-els.tutorialReplay.addEventListener("click", () => { els.result.classList.remove("visible"); els.result.hidden = true; startLevel(true); });
-els.tutorialSkip.addEventListener("click", () => { tutorialActive = false; localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "skipped"); updateTutorial(); });
+els.tutorialReplay.addEventListener("click", () => {
+  els.result.classList.remove("visible"); els.result.hidden = true;
+  if (puzzle.isLesson) {
+    startLevel(true);
+  } else {
+    helpOpen = !helpOpen;
+    updateTutorial();
+  }
+});
+els.tutorialSkip.addEventListener("click", () => {
+  if (helpOpen && !tutorialActive) {
+    helpOpen = false;
+  } else {
+    tutorialActive = false;
+    localStorage.setItem(`quantum-loom-quantum-lesson-${level}`, "skipped");
+  }
+  updateTutorial();
+});
 els.sound.addEventListener("click", () => { soundOn = !soundOn; els.sound.textContent = soundOn ? "◉" : "○"; });
 
 function resize() {
