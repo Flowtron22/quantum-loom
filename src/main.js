@@ -356,7 +356,18 @@ function makeGateButton(type, qubit) {
 function renderTray() {
   els.tray.innerHTML = "";
   Object.keys(GATES).forEach((type) => {
-    for (let q = 0; q < puzzle.qubitCount; q += 1) els.tray.appendChild(makeGateButton(type, q));
+    const def = GATES[type];
+    const bank = document.createElement("section");
+    bank.className = `gate-bank gate-bank-${type.toLowerCase()}`;
+    bank.setAttribute("aria-label", `${def.name} gates`);
+    const label = document.createElement("div");
+    label.className = "gate-bank-label";
+    label.innerHTML = `<strong>${def.short}</strong><span>${def.name}</span>`;
+    const row = document.createElement("div");
+    row.className = "gate-row";
+    for (let q = 0; q < puzzle.qubitCount; q += 1) row.appendChild(makeGateButton(type, q));
+    bank.append(label, row);
+    els.tray.appendChild(bank);
   });
 }
 
