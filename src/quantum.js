@@ -37,6 +37,12 @@ export function runCircuit(initial, gates) {
   return gates.reduce(applyGate, initial.slice());
 }
 
+export function traceCircuit(initial, gates) {
+  const states = [initial.slice()];
+  for (const gate of gates) states.push(applyGate(states.at(-1), gate));
+  return states;
+}
+
 export function statesEqual(a, b) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }

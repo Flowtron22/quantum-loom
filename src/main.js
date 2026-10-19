@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
-import { GATES, generatePuzzle, rankSolution, runCircuit, statesEqual, tutorialPuzzle } from "./quantum.js";
+import { GATES, generatePuzzle, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
 const els = {
   canvas: document.querySelector("#scene"),
@@ -28,6 +28,9 @@ const els = {
   tutorialTitle: document.querySelector("#tutorial-title"),
   tutorialCopy: document.querySelector("#tutorial-copy"),
   tutorialSkip: document.querySelector("#tutorial-skip"),
+  physicsStatus: document.querySelector("#physics-status"),
+  physicsStatusText: document.querySelector("#physics-status-text"),
+  shell: document.querySelector(".game-shell"),
 };
 
 let level = 1;
@@ -38,6 +41,8 @@ let current = [];
 let soundOn = true;
 let audioContext;
 let tutorialActive = false;
+let simulation = null;
+let screenShake = 0;
 
 const tutorialPrompts = [
   {
@@ -79,7 +84,11 @@ scene.add(loom);
 const strands = new THREE.Group();
 const nodes = new THREE.Group();
 const particles = new THREE.Group();
-loom.add(strands, nodes, particles);
+const gateMachines = new THREE.Group();
+const pulseActors = new THREE.Group();
+const burstParticles = new THREE.Group();
+const targetChambers = new THREE.Group();
+loom.add(strands, nodes, particles, gateMachines, targetChambers, pulseActors, burstParticles);
 
 const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x151b26, metalness: 0.86, roughness: 0.26 });
 const railGeometry = new THREE.BoxGeometry(0.16, 6.8, 0.18);
@@ -137,9 +146,71 @@ function makeCurve(start, end, bend, color) {
 function clearGroup(group) {
   while (group.children.length) {
     const child = group.children.pop();
-    child.geometry?.dispose();
-    child.material?.dispose();
+    child.traverse?.((part) => {
+      part.geometry?.dispose();
+      part.material?.dispose();
+    });
   }
+}
+
+function qubitXs(count) {
+  return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * 1.85);
+}
+
+function gateY(index, total) {
+  return total <= 1 ? 0 : 2.05 - index * (4.1 / Math.max(1, total - 1));
+}
+
+function createGateMachine(gate, index, xs) {
+  const color = GATES[gate.type].color;
+  const group = new THREE.Group();
+  const metal = new THREE.MeshStandardMaterial({ color: 0x18232d, metalness: 0.92, roughness: 0.22 });
+  const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.4, metalness: 0.35, roughness: 0.18 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.065, 8, 28), glow);
+  group.add(ring);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.18, 12), metal);
+  hub.rotation.x = Math.PI / 2;
+  group.add(hub);
+
+  if (gate.type === "X") {
+    for (const rotation of [Math.PI / 4, -Math.PI / 4]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), glow);
+      bar.rotation.z = rotation;
+      group.add(bar);
+    }
+  } else if (gate.type === "H") {
+    for (const x of [-0.15, 0.15]) {
+      const prong = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), glow);
+      prong.position.x = x;
+      group.add(prong);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.07, 0.08), glow);
+    group.add(bridge);
+  } else {
+    const wave = new THREE.Mesh(new THREE.TorusKnotGeometry(0.17, 0.038, 40, 6, 2, 3), glow);
+    wave.scale.y = 0.72;
+    group.add(wave);
+  }
+
+  group.position.set(xs[gate.qubit], gateY(index, placed.length), 0.22);
+  group.userData = { gate, recoil: 0, baseY: group.position.y, baseScale: 1 };
+  return group;
+}
+
+function rebuildMachines(xs) {
+  clearGroup(gateMachines);
+  clearGroup(targetChambers);
+  placed.forEach((gate, index) => gateMachines.add(createGateMachine(gate, index, xs)));
+  puzzle.target.forEach((value, index) => {
+    const color = stateColor(value);
+    const chamber = new THREE.Mesh(
+      new THREE.TorusGeometry(0.28, 0.055, 8, 32),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2, metalness: 0.48, roughness: 0.2 }),
+    );
+    chamber.position.set(xs[index], -2.9, 0.16);
+    chamber.userData.baseScale = 1;
+    targetChambers.add(chamber);
+  });
 }
 
 function rebuildLoom() {
@@ -147,7 +218,7 @@ function rebuildLoom() {
   clearGroup(nodes);
   clearGroup(particles);
   const count = current.length;
-  const xs = Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * 1.85);
+  const xs = qubitXs(count);
 
   current.forEach((value, index) => {
     const color = stateColor(value);
@@ -173,6 +244,60 @@ function rebuildLoom() {
       particles.add(dot);
     }
   });
+  rebuildMachines(xs);
+}
+
+function spawnPulseActors(state) {
+  clearGroup(pulseActors);
+  const xs = qubitXs(state.length);
+  state.forEach((value, qubit) => {
+    const color = stateColor(value);
+    const actor = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.19, 2),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 4.5, roughness: 0.08 }),
+    );
+    actor.position.set(xs[qubit], 2.92, 0.5);
+    actor.userData = { qubit, state: value };
+    pulseActors.add(actor);
+  });
+}
+
+function recolorPulseActors(state) {
+  pulseActors.children.forEach((actor) => {
+    const value = state[actor.userData.qubit];
+    const color = stateColor(value);
+    actor.userData.state = value;
+    actor.material.color.setHex(color);
+    actor.material.emissive.setHex(color);
+    actor.scale.setScalar(value === "+" || value === "-" ? 1.28 : 1);
+  });
+}
+
+function emitBurst(position, color, count = 18, force = 1) {
+  for (let i = 0; i < count; i += 1) {
+    const particle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025 + Math.random() * 0.035, 7, 7),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
+    );
+    particle.position.copy(position);
+    const angle = Math.random() * Math.PI * 2;
+    particle.userData.velocity = new THREE.Vector3(
+      Math.cos(angle) * (0.5 + Math.random() * 1.5) * force,
+      Math.sin(angle) * (0.5 + Math.random() * 1.5) * force,
+      (Math.random() - 0.5) * force,
+    );
+    particle.userData.life = 1;
+    burstParticles.add(particle);
+  }
+}
+
+function setControlsLocked(locked) {
+  els.pulse.disabled = locked;
+  els.undo.disabled = locked || placed.length === 0;
+  els.reset.disabled = locked || placed.length === 0;
+  els.tray.querySelectorAll("button").forEach((button) => { button.disabled = locked; });
+  els.slots.querySelectorAll("button").forEach((button) => { button.disabled = locked; });
+  els.shell.classList.toggle("simulating", locked);
 }
 
 function makeGateButton(type, qubit) {
@@ -283,17 +408,95 @@ function removeGate(index) {
 }
 
 function pulseCircuit() {
-  loom.userData.pulse = 1;
-  if (statesEqual(current, puzzle.target)) {
-    tone(440, 0.08);
-    setTimeout(() => tone(660, 0.1), 90);
-    setTimeout(showResult, 360);
+  if (simulation) return;
+  const success = statesEqual(current, puzzle.target);
+  simulation = {
+    startedAt: clock.getElapsedTime(),
+    duration: Math.max(1.65, placed.length * 0.34 + 0.92),
+    trace: traceCircuit(puzzle.initial, placed),
+    lastGate: -1,
+    success,
+    finished: false,
+  };
+  spawnPulseActors(puzzle.initial);
+  renderState(els.live, puzzle.initial);
+  els.physicsStatus.hidden = false;
+  els.physicsStatus.className = "physics-status active";
+  els.physicsStatusText.textContent = "ENERGY RELEASED";
+  els.pulse.textContent = "LOOM RUNNING";
+  setControlsLocked(true);
+  tone(150, 0.18);
+}
+
+function finishPhysicalRun() {
+  if (!simulation || simulation.finished) return;
+  simulation.finished = true;
+  renderState(els.live, current);
+  if (simulation.success) {
+    els.physicsStatus.className = "physics-status active success";
+    els.physicsStatusText.textContent = "TIMELINES STABILIZED";
+    targetChambers.children.forEach((chamber) => emitBurst(chamber.position, chamber.material.color.getHex(), 34, 1.55));
+    targetChambers.children.forEach((chamber) => { chamber.userData.burst = 1; });
+    loom.userData.pulse = 1;
+    screenShake = 1;
+    tone(330, 0.12);
+    setTimeout(() => tone(495, 0.16), 110);
+    setTimeout(() => tone(742, 0.24), 230);
+    navigator.vibrate?.([35, 35, 80]);
+    setTimeout(() => {
+      simulation = null;
+      els.physicsStatus.hidden = true;
+      showResult();
+    }, 760);
   } else {
-    els.pulse.textContent = "SIGNATURE MISMATCH";
+    els.physicsStatus.className = "physics-status active failure";
+    els.physicsStatusText.textContent = "BRANCH COLLISION";
+    pulseActors.children.forEach((actor) => emitBurst(actor.position, 0xff315f, 24, 1.8));
+    pulseActors.visible = false;
+    screenShake = 0.75;
+    tone(82, 0.32);
+    navigator.vibrate?.(90);
     flash(els.live);
-    tone(105, 0.14);
-    setTimeout(() => { els.pulse.textContent = "PULSE CIRCUIT"; }, 850);
+    setTimeout(() => {
+      simulation = null;
+      pulseActors.visible = true;
+      clearGroup(pulseActors);
+      els.physicsStatus.hidden = true;
+      els.pulse.textContent = "PULSE CIRCUIT";
+      setControlsLocked(false);
+    }, 1050);
   }
+}
+
+function animatePhysicalRun(t) {
+  if (!simulation) return;
+  const progress = Math.min(1, (t - simulation.startedAt) / simulation.duration);
+  const eased = progress * progress * (3 - 2 * progress);
+  const y = 2.92 - eased * 5.82;
+  pulseActors.children.forEach((actor, index) => {
+    actor.position.y = y;
+    actor.rotation.x += 0.12;
+    actor.rotation.y += 0.16;
+    actor.position.x += Math.sin(t * 16 + index) * 0.0025;
+  });
+
+  const crossed = placed.reduce((count, _gate, index) => progress >= (index + 1) / (placed.length + 1) ? count + 1 : count, 0) - 1;
+  while (simulation.lastGate < crossed) {
+    simulation.lastGate += 1;
+    const index = simulation.lastGate;
+    const gate = placed[index];
+    const state = simulation.trace[index + 1];
+    recolorPulseActors(state);
+    renderState(els.live, state);
+    const machine = gateMachines.children[index];
+    if (machine) {
+      machine.userData.recoil = 1;
+      emitBurst(machine.position, GATES[gate.type].color, gate.type === "H" ? 22 : 14, 0.75);
+    }
+    els.physicsStatusText.textContent = `${GATES[gate.type].name} q${gate.qubit}`;
+    tone(240 + index * 70 + gate.qubit * 45, 0.09);
+  }
+  if (progress >= 1) finishPhysicalRun();
 }
 
 function showResult() {
@@ -316,6 +519,12 @@ function showResult() {
 }
 
 function startLevel(forceTutorial = false) {
+  simulation = null;
+  clearGroup(pulseActors);
+  clearGroup(burstParticles);
+  els.physicsStatus.hidden = true;
+  els.pulse.textContent = "PULSE CIRCUIT";
+  setControlsLocked(false);
   tutorialActive = forceTutorial || (level === 1 && localStorage.getItem("quantum-loom-tutorial") !== "complete");
   puzzle = tutorialActive ? tutorialPuzzle() : generatePuzzle(level);
   placed = [];
@@ -382,8 +591,11 @@ new ResizeObserver(resize).observe(els.canvas);
 const clock = new THREE.Clock();
 function animate() {
   const t = clock.getElapsedTime();
-  loom.rotation.y = Math.sin(t * 0.32) * 0.045;
-  loom.position.y = Math.sin(t * 0.7) * 0.035;
+  animatePhysicalRun(t);
+  loom.rotation.y = Math.sin(t * 0.32) * 0.045 + (Math.random() - 0.5) * screenShake * 0.025;
+  loom.position.x = (Math.random() - 0.5) * screenShake * 0.08;
+  loom.position.y = Math.sin(t * 0.7) * 0.035 + (Math.random() - 0.5) * screenShake * 0.06;
+  screenShake *= 0.92;
   nodes.children.forEach((node, i) => {
     const scale = 1 + Math.sin(t * 3.2 + i) * 0.12 + (loom.userData.pulse || 0) * 0.5;
     node.scale.setScalar(scale);
@@ -391,6 +603,30 @@ function animate() {
   particles.children.forEach((dot) => {
     dot.position.y -= dot.userData.speed * 12;
     if (dot.position.y < -2.9) dot.position.y = 2.9;
+  });
+  gateMachines.children.forEach((machine, index) => {
+    machine.rotation.z += 0.004 * (index % 2 ? -1 : 1);
+    machine.userData.recoil *= 0.82;
+    const kick = machine.userData.recoil;
+    machine.scale.set(1 + kick * 0.32, 1 - kick * 0.18, 1 + kick * 0.32);
+    machine.position.y = machine.userData.baseY + kick * 0.08;
+  });
+  targetChambers.children.forEach((chamber, index) => {
+    chamber.rotation.z += 0.006 * (index % 2 ? -1 : 1);
+    chamber.userData.burst = (chamber.userData.burst || 0) * 0.92;
+    chamber.scale.setScalar(1 + chamber.userData.burst * 0.75 + Math.sin(t * 2.8 + index) * 0.035);
+  });
+  burstParticles.children.slice().forEach((particle) => {
+    particle.userData.life -= 0.025;
+    particle.position.addScaledVector(particle.userData.velocity, 0.025);
+    particle.userData.velocity.multiplyScalar(0.965);
+    particle.material.opacity = Math.max(0, particle.userData.life);
+    particle.scale.setScalar(Math.max(0.1, particle.userData.life));
+    if (particle.userData.life <= 0) {
+      burstParticles.remove(particle);
+      particle.geometry.dispose();
+      particle.material.dispose();
+    }
   });
   loom.userData.pulse = Math.max(0, (loom.userData.pulse || 0) - 0.035);
   starField.rotation.z = t * 0.008;

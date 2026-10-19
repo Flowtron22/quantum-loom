@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyGate, generatePuzzle, rankSolution, runCircuit, shortestPath, statesEqual, tutorialPuzzle } from "./quantum.js";
+import { applyGate, generatePuzzle, rankSolution, runCircuit, shortestPath, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
 test("gates transform basis and phase states", () => {
   assert.deepEqual(applyGate(["0", "+"], { type: "X", qubit: 0 }), ["1", "+"]);
@@ -42,6 +42,16 @@ test("tutorial teaches a three-gate optimal solution", () => {
     puzzle.target.reduce((total, value, qubit) => total + shortestPath(puzzle.initial[qubit], value, qubit).length, 0),
     puzzle.par,
   );
+});
+
+test("circuit trace exposes every physical transformation", () => {
+  const puzzle = tutorialPuzzle();
+  assert.deepEqual(traceCircuit(puzzle.initial, puzzle.solution), [
+    ["1", "0"],
+    ["0", "0"],
+    ["+", "0"],
+    ["+", "1"],
+  ]);
 });
 
 function seeded(seed) {
