@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#05070c" />
+    <meta name="description" content="A portrait-first procedural quantum circuit puzzle built with Three.js." />
+    <title>Quantum Loom</title>
+  </head>
+  <body>
+    <main id="app" aria-label="Quantum Loom game">
+      <section class="game-shell">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">QUANTUM LOOM</p>
+            <h1>SECTOR <span id="level">01</span></h1>
+          </div>
+          <div class="run-stats" aria-label="Run statistics">
+            <span>STREAK <strong id="streak">0</strong></span>
+            <button id="sound-toggle" class="icon-button" aria-label="Toggle sound">◉</button>
+          </div>
+        </header>
+
+        <section class="objective-card" aria-labelledby="objective-title">
+          <div>
+            <p class="micro-label" id="objective-title">TARGET SIGNATURE</p>
+            <div id="target-state" class="state-row" aria-label="Target quantum state"></div>
+          </div>
+          <div class="par-box">
+            <span>PAR</span>
+            <strong id="par">3</strong>
+          </div>
+        </section>
+
+        <section class="loom-panel" aria-label="Interactive quantum circuit visualization">
+          <canvas id="scene"></canvas>
+          <div class="scanlines" aria-hidden="true"></div>
+          <div class="loom-hud">
+            <span>LIVE STATE</span>
+            <div id="live-state" class="state-row compact"></div>
+          </div>
+          <div id="slots" class="slots" aria-label="Circuit gate slots"></div>
+        </section>
+
+        <section class="gate-panel" aria-labelledby="gate-title">
+          <div class="gate-panel-heading">
+            <div>
+              <p class="micro-label" id="gate-title">GATE ARRAY</p>
+              <p>Tap or drag a gate into the loom</p>
+            </div>
+            <span id="move-count">0 / 5</span>
+          </div>
+          <div id="gate-tray" class="gate-tray"></div>
+        </section>
+
+        <footer class="controls">
+          <button id="undo" class="secondary-button">↶ UNDO</button>
+          <button id="reset" class="secondary-button">RESET</button>
+          <button id="pulse" class="primary-button">PULSE CIRCUIT</button>
+        </footer>
+      </section>
+    </main>
+
+    <div id="result" class="result-overlay" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+      <div class="result-card">
+        <p class="eyebrow">SIGNATURE LOCKED</p>
+        <div id="rank" class="rank">S</div>
+        <h2 id="result-title">Circuit stabilized</h2>
+        <p id="result-copy">Optimal weave. No wasted motion.</p>
+        <div class="result-metrics">
+          <span>GATES <strong id="result-gates">3</strong></span>
+          <span>PAR <strong id="result-par">3</strong></span>
+        </div>
+        <button id="next" class="primary-button wide">NEXT SECTOR</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
