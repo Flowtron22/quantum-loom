@@ -1,67 +1,53 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyGate, generatePuzzle, qubitCountForLevel, rankSolution, routeState, runCircuit, shortestPath, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
+import { applyGate, basisState, generatePuzzle, isNormalized, qubitCountForLevel, rankSolution, runCircuit, statesEqual, traceCircuit, tutorialPuzzle } from "./quantum.js";
 
-test("gates transform basis and phase states", () => {
-  assert.deepEqual(applyGate(["0", "+"], { type: "X", qubit: 0 }), ["1", "+"]);
-  assert.deepEqual(applyGate(["0", "+"], { type: "H", qubit: 0 }), ["+", "+"]);
-  assert.deepEqual(applyGate(["0", "+"], { type: "Z", qubit: 1 }), ["0", "-"]);
+test("X permutes computational basis lanes", () => {
+  assert.ok(statesEqual(applyGate(basisState(2, 0), { type: "X", qubit: 0 }, 2), basisState(2, 2)));
+  assert.ok(statesEqual(applyGate(basisState(2, 1), { type: "X", qubit: 1 }, 2), basisState(2, 0)));
 });
 
-test("generated puzzles retain a valid routed solution", () => {
-  for (let level = 1; level <= 40; level += 1) {
+test("H splits and recombines amplitude", () => {
+  const split = applyGate(basisState(1, 0), { type: "H", qubit: 0 }, 1);
+  assert.ok(Math.abs(split[0].re - Math.SQRT1_2) < 1e-8);
+  assert.ok(Math.abs(split[1].re - Math.SQRT1_2) < 1e-8);
+  assert.ok(statesEqual(applyGate(split, { type: "H", qubit: 0 }, 1), basisState(1, 0)));
+});
+
+test("Z changes relative phase", () => {
+  const split = applyGate(basisState(1, 0), { type: "H", qubit: 0 }, 1);
+  const phased = applyGate(split, { type: "Z", qubit: 0 }, 1);
+  assert.ok(phased[0].re > 0 && phased[1].re < 0);
+});
+
+test("controlled X only flips when its control bit is one", () => {
+  const gate = { type: "CX", control: 0, qubit: 1 };
+  assert.ok(statesEqual(applyGate(basisState(2, 0), gate, 2), basisState(2, 0)));
+  assert.ok(statesEqual(applyGate(basisState(2, 2), gate, 2), basisState(2, 3)));
+});
+
+test("generated puzzles have normalized reachable targets", () => {
+  for (let level = 1; level <= 30; level += 1) {
     const puzzle = generatePuzzle(level, seeded(level));
-    assert.ok(statesEqual(routeState(runCircuit(puzzle.initial, puzzle.solution), puzzle.routing), puzzle.target));
-    assert.equal(puzzle.solution.length, puzzle.par);
-    assert.ok(puzzle.maxMoves >= puzzle.par);
+    assert.ok(isNormalized(puzzle.target));
+    assert.ok(statesEqual(runCircuit(puzzle.initial, puzzle.solution, puzzle.qubitCount), puzzle.target));
+    assert.equal(puzzle.laneCount, 2 ** puzzle.qubitCount);
   }
 });
 
-test("generated par is composed of shortest per-qubit paths", () => {
-  for (let level = 1; level <= 20; level += 1) {
-    const puzzle = generatePuzzle(level, seeded(level * 31));
-    const internalTarget = Array(puzzle.qubitCount);
-    puzzle.routing.forEach((exit, source) => { internalTarget[source] = puzzle.target[exit]; });
-    const optimalLength = internalTarget.reduce(
-      (total, value, qubit) => total + shortestPath(puzzle.initial[qubit], value, qubit).length,
-      0,
-    );
-    assert.equal(puzzle.par, optimalLength);
-  }
+test("progression reaches sixteen basis lanes", () => {
+  assert.equal(qubitCountForLevel(1), 1);
+  assert.equal(qubitCountForLevel(3), 2);
+  assert.equal(qubitCountForLevel(7), 3);
+  assert.equal(qubitCountForLevel(12), 4);
 });
 
-test("strand progression reaches dense endgame networks", () => {
-  assert.equal(qubitCountForLevel(1), 2);
-  assert.equal(qubitCountForLevel(6), 4);
-  assert.equal(qubitCountForLevel(23), 10);
-  assert.equal(qubitCountForLevel(30), 12);
-  assert.ok(generatePuzzle(6, seeded(6)).crossings > 0);
-});
-
-test("solution ranks reward par", () => {
-  assert.equal(rankSolution(3, 3), "S");
-  assert.equal(rankSolution(4, 3), "A");
-  assert.equal(rankSolution(5, 3), "B");
-});
-
-test("tutorial teaches a three-gate optimal solution", () => {
+test("tutorial and traces expose every state-vector step", () => {
   const puzzle = tutorialPuzzle();
-  assert.deepEqual(runCircuit(puzzle.initial, puzzle.solution), puzzle.target);
-  assert.equal(puzzle.solution.length, puzzle.par);
-  assert.equal(
-    puzzle.target.reduce((total, value, qubit) => total + shortestPath(puzzle.initial[qubit], value, qubit).length, 0),
-    puzzle.par,
-  );
-});
-
-test("circuit trace exposes every physical transformation", () => {
-  const puzzle = tutorialPuzzle();
-  assert.deepEqual(traceCircuit(puzzle.initial, puzzle.solution), [
-    ["1", "0"],
-    ["0", "0"],
-    ["+", "0"],
-    ["+", "1"],
-  ]);
+  const trace = traceCircuit(puzzle.initial, puzzle.solution, puzzle.qubitCount);
+  assert.equal(trace.length, 2);
+  assert.ok(statesEqual(trace.at(-1), puzzle.target));
+  assert.equal(rankSolution(1, 1), "S");
 });
 
 function seeded(seed) {

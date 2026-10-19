@@ -43,11 +43,12 @@
               </div>
               <button id="tutorial-skip" class="text-button">SKIP</button>
             </div>
-            <p id="tutorial-copy">Tap X₀ to change q0 from |1〉 to |0〉.</p>
+              <p id="tutorial-copy">Tap X₀ to move the amplitude from basis lane |0〉 to |1〉.</p>
             <div class="gate-key" aria-label="Gate reference">
-              <span><b>X</b> flip 0 ↔ 1</span>
-              <span><b>H</b> split into + / −</span>
-              <span><b>Z</b> swap + ↔ −</span>
+              <span><b>X</b> swap basis lanes</span>
+              <span><b>H</b> split ±0.707</span>
+              <span><b>Z</b> flip phase</span>
+              <span><b>C·X</b> conditional flip</span>
             </div>
           </div>
         </section>
@@ -71,7 +72,7 @@
           <div class="gate-panel-heading">
             <div>
               <p class="micro-label" id="gate-title">GATE ARRAY</p>
-              <p>Gate q# at the top, then trace its strand to the output</p>
+              <p>Build a reversible algorithm, then align every output amplitude</p>
             </div>
             <span id="move-count">0 / 5</span>
           </div>

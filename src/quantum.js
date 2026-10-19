@@ -1,167 +1,185 @@
-export const STATES = ["0", "1", "+", "-"];
+const SQRT1_2 = Math.SQRT1_2;
+const EPSILON = 1e-7;
 
 export const GATES = {
-  X: {
-    name: "BIT FLIP",
-    short: "X",
-    color: 0x49e7ff,
-    apply(value) {
-      return ({ "0": "1", "1": "0", "+": "+", "-": "-" })[value];
-    },
-  },
-  H: {
-    name: "SPLIT",
-    short: "H",
-    color: 0xffcc58,
-    apply(value) {
-      return ({ "0": "+", "1": "-", "+": "0", "-": "1" })[value];
-    },
-  },
-  Z: {
-    name: "PHASE",
-    short: "Z",
-    color: 0xff4f94,
-    apply(value) {
-      return ({ "0": "0", "1": "1", "+": "-", "-": "+" })[value];
-    },
-  },
+  X: { name: "BIT FLIP", short: "X", color: 0x49e7ff },
+  H: { name: "SPLIT", short: "H", color: 0xffcc58 },
+  Z: { name: "PHASE", short: "Z", color: 0xff4f94 },
+  CX: { name: "CONTROL", short: "C·X", color: 0x70ff9d },
 };
 
-export function applyGate(state, gate) {
-  const next = state.slice();
-  next[gate.qubit] = GATES[gate.type].apply(next[gate.qubit]);
-  return next;
+export function qubitCountForLevel(level) {
+  if (level < 3) return 1;
+  if (level < 7) return 2;
+  if (level < 12) return 3;
+  return 4;
 }
 
-export function runCircuit(initial, gates) {
-  return gates.reduce(applyGate, initial.slice());
+export function basisLabel(index, qubitCount) {
+  return index.toString(2).padStart(qubitCount, "0");
 }
 
-export function traceCircuit(initial, gates) {
-  const states = [initial.slice()];
-  for (const gate of gates) states.push(applyGate(states.at(-1), gate));
+export function basisState(qubitCount, index = 0) {
+  return Array.from({ length: 2 ** qubitCount }, (_, lane) => ({ re: lane === index ? 1 : 0, im: 0 }));
+}
+
+export function cloneState(state) {
+  return state.map(({ re, im }) => ({ re, im }));
+}
+
+function bitMask(qubit, qubitCount) {
+  return 1 << (qubitCount - qubit - 1);
+}
+
+export function gateMapIndex(index, gate, qubitCount) {
+  const targetMask = bitMask(gate.qubit, qubitCount);
+  if (gate.type === "X") return index ^ targetMask;
+  if (gate.type === "CX") {
+    const controlMask = bitMask(gate.control, qubitCount);
+    return index & controlMask ? index ^ targetMask : index;
+  }
+  return index;
+}
+
+export function applyGate(state, gate, qubitCount = Math.log2(state.length)) {
+  const next = state.map(() => ({ re: 0, im: 0 }));
+  const mask = bitMask(gate.qubit, qubitCount);
+  if (gate.type === "X" || gate.type === "CX") {
+    state.forEach((amplitude, index) => {
+      next[gateMapIndex(index, gate, qubitCount)] = { ...amplitude };
+    });
+    return next;
+  }
+  if (gate.type === "Z") {
+    return state.map((amplitude, index) => {
+      const sign = index & mask ? -1 : 1;
+      return { re: amplitude.re * sign, im: amplitude.im * sign };
+    });
+  }
+  if (gate.type === "H") {
+    for (let index = 0; index < state.length; index += 1) {
+      if (index & mask) continue;
+      const paired = index | mask;
+      next[index] = { re: (state[index].re + state[paired].re) * SQRT1_2, im: (state[index].im + state[paired].im) * SQRT1_2 };
+      next[paired] = { re: (state[index].re - state[paired].re) * SQRT1_2, im: (state[index].im - state[paired].im) * SQRT1_2 };
+    }
+    return next;
+  }
+  throw new Error(`Unknown gate: ${gate.type}`);
+}
+
+export function runCircuit(initial, gates, qubitCount = Math.log2(initial.length)) {
+  return gates.reduce((state, gate) => applyGate(state, gate, qubitCount), cloneState(initial));
+}
+
+export function traceCircuit(initial, gates, qubitCount = Math.log2(initial.length)) {
+  const states = [cloneState(initial)];
+  for (const gate of gates) states.push(applyGate(states.at(-1), gate, qubitCount));
   return states;
 }
 
-export function routeState(state, routing = state.map((_, index) => index)) {
-  const output = Array(state.length);
-  routing.forEach((exit, source) => { output[exit] = state[source]; });
-  return output;
+export function amplitudeMagnitude({ re, im }) {
+  return Math.hypot(re, im);
 }
 
-export function statesEqual(a, b) {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
+export function statesEqual(a, b, epsilon = 1e-5) {
+  if (a.length !== b.length) return false;
+  const anchor = a.findIndex((amplitude) => amplitudeMagnitude(amplitude) > epsilon);
+  const otherAnchor = b.findIndex((amplitude) => amplitudeMagnitude(amplitude) > epsilon);
+  if (anchor < 0 || otherAnchor < 0) return anchor === otherAnchor;
+  if (anchor !== otherAnchor) return false;
+  const left = a[anchor];
+  const right = b[anchor];
+  const denominator = right.re * right.re + right.im * right.im;
+  const phase = {
+    re: (left.re * right.re + left.im * right.im) / denominator,
+    im: (left.im * right.re - left.re * right.im) / denominator,
+  };
+  if (Math.abs(Math.hypot(phase.re, phase.im) - 1) > epsilon) return false;
+  return a.every((amplitude, index) => {
+    const expected = {
+      re: b[index].re * phase.re - b[index].im * phase.im,
+      im: b[index].re * phase.im + b[index].im * phase.re,
+    };
+    return Math.abs(amplitude.re - expected.re) < epsilon && Math.abs(amplitude.im - expected.im) < epsilon;
+  });
 }
 
 function randomInt(max, random) {
   return Math.floor(random() * max);
 }
 
-export function shortestPath(from, to, qubit) {
-  if (from === to) return [];
-  const queue = [{ value: from, path: [] }];
-  const visited = new Set([from]);
-  while (queue.length) {
-    const current = queue.shift();
-    for (const type of Object.keys(GATES)) {
-      const value = GATES[type].apply(current.value);
-      const path = [...current.path, { type, qubit }];
-      if (value === to) return path;
-      if (!visited.has(value)) {
-        visited.add(value);
-        queue.push({ value, path });
+export function gateCatalog(qubitCount, includeControl = true) {
+  const gates = [];
+  for (const type of ["X", "H", "Z"]) {
+    for (let qubit = 0; qubit < qubitCount; qubit += 1) gates.push({ type, qubit });
+  }
+  if (includeControl && qubitCount > 1) {
+    for (let control = 0; control < qubitCount; control += 1) {
+      for (let qubit = 0; qubit < qubitCount; qubit += 1) {
+        if (control !== qubit) gates.push({ type: "CX", control, qubit });
       }
     }
   }
-  return [];
+  return gates;
 }
 
-export function qubitCountForLevel(level) {
-  if (level < 3) return 2;
-  if (level < 5) return 3;
-  if (level < 8) return 4;
-  if (level < 11) return 5;
-  if (level < 15) return 6;
-  if (level < 19) return 7;
-  if (level < 23) return 8;
-  if (level < 30) return 10;
-  return 12;
+function sameGate(a, b) {
+  return a?.type === b?.type && a?.qubit === b?.qubit && a?.control === b?.control;
 }
 
-function generateRouting(count, level, random) {
-  const routing = Array.from({ length: count }, (_, index) => index);
-  if (level < 6) return routing;
-
-  const swaps = level >= 23
-    ? count * 2
-    : Math.min(count + 2, 1 + Math.floor((level - 6) / 2));
-  for (let i = 0; i < swaps; i += 1) {
-    const left = randomInt(count - 1, random);
-    [routing[left], routing[left + 1]] = [routing[left + 1], routing[left]];
+function createSolution(level, qubitCount, random) {
+  const includeControl = level >= 5;
+  const catalog = gateCatalog(qubitCount, includeControl);
+  const length = Math.min(7, 1 + Math.ceil(level / 2));
+  const solution = [];
+  if (level >= 2) solution.push({ type: "H", qubit: randomInt(qubitCount, random) });
+  if (includeControl) {
+    const control = randomInt(qubitCount, random);
+    solution.push({ type: "CX", control, qubit: (control + 1 + randomInt(qubitCount - 1, random)) % qubitCount });
   }
-  if (routing.every((exit, source) => exit === source)) {
-    [routing[0], routing[1]] = [routing[1], routing[0]];
+  while (solution.length < length) {
+    const candidate = catalog[randomInt(catalog.length, random)];
+    if (!sameGate(candidate, solution.at(-1))) solution.push({ ...candidate });
   }
-  return routing;
-}
-
-function countCrossings(routing) {
-  let crossings = 0;
-  for (let left = 0; left < routing.length; left += 1) {
-    for (let right = left + 1; right < routing.length; right += 1) {
-      if (routing[left] > routing[right]) crossings += 1;
-    }
+  for (let index = solution.length - 1; index > 0; index -= 1) {
+    const other = randomInt(index + 1, random);
+    [solution[index], solution[other]] = [solution[other], solution[index]];
   }
-  return crossings;
+  return solution;
 }
 
 export function generatePuzzle(level = 1, random = Math.random) {
   const qubitCount = qubitCountForLevel(level);
-  const initial = Array.from({ length: qubitCount }, () => STATES[randomInt(2, random)]);
-  const routing = generateRouting(qubitCount, level, random);
-  const internalTarget = initial.slice();
-  const indices = Array.from({ length: qubitCount }, (_, index) => index);
-  for (let i = indices.length - 1; i > 0; i -= 1) {
-    const other = randomInt(i + 1, random);
-    [indices[i], indices[other]] = [indices[other], indices[i]];
-  }
-  const activeCount = Math.min(qubitCount, 2 + Math.floor(level / 4));
-  indices.slice(0, activeCount).forEach((qubit) => {
-    const alternatives = STATES.filter((value) => value !== initial[qubit]);
-    internalTarget[qubit] = alternatives[randomInt(alternatives.length, random)];
-  });
-  const solution = internalTarget.flatMap((value, qubit) => shortestPath(initial[qubit], value, qubit));
-  const target = routeState(internalTarget, routing);
-  const crossings = countCrossings(routing);
-
+  const initial = basisState(qubitCount, randomInt(2 ** qubitCount, random));
+  let solution;
+  let target;
+  let attempts = 0;
+  do {
+    solution = createSolution(level, qubitCount, random);
+    target = runCircuit(initial, solution, qubitCount);
+    attempts += 1;
+  } while (statesEqual(initial, target) && attempts < 12);
   return {
-    initial,
-    target,
-    solution,
+    initial, target, solution,
     par: solution.length,
     maxMoves: solution.length + 2,
     qubitCount,
-    routing,
-    crossings,
-    nexus: level >= 20 && level % 10 === 0,
+    laneCount: 2 ** qubitCount,
+    includeControl: level >= 5,
   };
 }
 
 export function tutorialPuzzle() {
   return {
-    initial: ["1", "0"],
-    target: ["+", "1"],
-    solution: [
-      { type: "X", qubit: 0 },
-      { type: "H", qubit: 0 },
-      { type: "X", qubit: 1 },
-    ],
-    par: 3,
-    maxMoves: 5,
-    qubitCount: 2,
-    routing: [0, 1],
-    crossings: 0,
-    nexus: false,
+    initial: basisState(1, 0),
+    target: basisState(1, 1),
+    solution: [{ type: "X", qubit: 0 }],
+    par: 1,
+    maxMoves: 3,
+    qubitCount: 1,
+    laneCount: 2,
+    includeControl: false,
     isTutorial: true,
   };
 }
@@ -171,4 +189,12 @@ export function rankSolution(moves, par) {
   if (moves === par + 1) return "A";
   if (moves === par + 2) return "B";
   return "C";
+}
+
+export function probabilityTotal(state) {
+  return state.reduce((total, { re, im }) => total + re * re + im * im, 0);
+}
+
+export function isNormalized(state) {
+  return Math.abs(probabilityTotal(state) - 1) < EPSILON;
 }

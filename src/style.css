@@ -91,6 +91,10 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .state-chip.s-one { color: var(--pink); background: rgba(255, 79, 148, 0.07); }
 .state-chip.s-plus { color: var(--gold); background: rgba(255, 204, 88, 0.07); }
 .state-chip.s-minus { color: var(--violet); background: rgba(167, 124, 255, 0.07); }
+.state-chip.s-positive { color: var(--cyan); background: rgba(73, 231, 255, 0.07); }
+.state-chip.s-negative { color: var(--violet); background: rgba(167, 124, 255, 0.07); }
+.state-chip.s-imaginary { color: #70ff9d; background: rgba(112, 255, 157, 0.07); }
+.state-chip.s-negativeImaginary { color: var(--gold); background: rgba(255, 204, 88, 0.07); }
 .state-row.compact { margin: 0; }
 .state-row.compact .state-chip { min-width: 41px; padding: 4px 5px; font-size: 10px; }
 .par-box { min-width: 48px; padding-left: 13px; border-left: 1px solid var(--line); text-align: center; }
@@ -174,6 +178,8 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .gate span { display: block; margin-top: 4px; font: 700 6px "Space Mono", monospace; letter-spacing: 0.08em; }
 .gate-h { color: var(--gold); background: rgba(255, 204, 88, 0.07); }
 .gate-z { color: var(--pink); background: rgba(255, 79, 148, 0.07); }
+.gate-cx { color: #70ff9d; background: rgba(112, 255, 157, 0.07); }
+.gate-bank-cx .gate-bank-label { color: #70ff9d; }
 
 .controls { display: grid; grid-template-columns: auto auto 1fr; gap: 7px; }
 .controls button, .result-card button { min-height: 45px; border-radius: 2px; font-weight: 700; letter-spacing: 0.07em; cursor: pointer; }
