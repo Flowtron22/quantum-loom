@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyGate, generatePuzzle, rankSolution, runCircuit, shortestPath, statesEqual } from "./quantum.js";
+import { applyGate, generatePuzzle, rankSolution, runCircuit, shortestPath, statesEqual, tutorialPuzzle } from "./quantum.js";
 
 test("gates transform basis and phase states", () => {
   assert.deepEqual(applyGate(["0", "+"], { type: "X", qubit: 0 }), ["1", "+"]);
@@ -32,6 +32,16 @@ test("solution ranks reward par", () => {
   assert.equal(rankSolution(3, 3), "S");
   assert.equal(rankSolution(4, 3), "A");
   assert.equal(rankSolution(5, 3), "B");
+});
+
+test("tutorial teaches a three-gate optimal solution", () => {
+  const puzzle = tutorialPuzzle();
+  assert.deepEqual(runCircuit(puzzle.initial, puzzle.solution), puzzle.target);
+  assert.equal(puzzle.solution.length, puzzle.par);
+  assert.equal(
+    puzzle.target.reduce((total, value, qubit) => total + shortestPath(puzzle.initial[qubit], value, qubit).length, 0),
+    puzzle.par,
+  );
 });
 
 function seeded(seed) {

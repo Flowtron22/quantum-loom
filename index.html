@@ -17,6 +17,7 @@
           </div>
           <div class="run-stats" aria-label="Run statistics">
             <span>STREAK <strong id="streak">0</strong></span>
+            <button id="tutorial-replay" class="icon-button help-button" aria-label="Replay tutorial">?</button>
             <button id="sound-toggle" class="icon-button" aria-label="Toggle sound">◉</button>
           </div>
         </header>
@@ -29,6 +30,25 @@
           <div class="par-box">
             <span>PAR</span>
             <strong id="par">3</strong>
+          </div>
+        </section>
+
+        <section id="tutorial-coach" class="tutorial-coach" aria-live="polite" hidden>
+          <div class="coach-marker"><span id="tutorial-step">1 / 4</span></div>
+          <div class="coach-content">
+            <div class="coach-heading">
+              <div>
+                <p class="micro-label">LOOM TRAINING</p>
+                <h2 id="tutorial-title">Flip the first strand</h2>
+              </div>
+              <button id="tutorial-skip" class="text-button">SKIP</button>
+            </div>
+            <p id="tutorial-copy">Tap X₀ to change q0 from |1〉 to |0〉.</p>
+            <div class="gate-key" aria-label="Gate reference">
+              <span><b>X</b> flip 0 ↔ 1</span>
+              <span><b>H</b> split into + / −</span>
+              <span><b>Z</b> swap + ↔ −</span>
+            </div>
           </div>
         </section>
 

@@ -41,7 +41,7 @@ button { font: inherit; }
   min-height: 100svh;
   padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-rows: auto auto minmax(300px, 1fr) auto auto;
+  grid-template-rows: auto auto auto minmax(300px, 1fr) auto auto;
   gap: 10px;
 }
 
@@ -52,6 +52,7 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .run-stats { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 700 9px "Space Mono", monospace; letter-spacing: 0.08em; }
 .run-stats strong { color: var(--text); font-size: 14px; }
 .icon-button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; color: var(--cyan); background: #0a1018; cursor: pointer; }
+.help-button { color: var(--gold); border-color: rgba(255, 204, 88, 0.32); font: 700 14px "Space Mono", monospace; }
 
 .objective-card {
   min-height: 70px;
@@ -84,6 +85,29 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .par-box span { display: block; color: var(--muted); font: 700 8px "Space Mono", monospace; }
 .par-box strong { color: var(--gold); font: 700 24px "Space Mono", monospace; }
 
+.tutorial-coach {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  min-height: 94px;
+  border: 1px solid rgba(255, 204, 88, 0.38);
+  background: linear-gradient(110deg, rgba(33, 27, 13, 0.96), rgba(11, 16, 25, 0.96) 50%);
+  box-shadow: 0 0 24px rgba(255, 204, 88, 0.08);
+}
+.tutorial-coach[hidden] { display: none; }
+.coach-marker { display: grid; place-items: center; border-right: 1px solid rgba(255, 204, 88, 0.25); color: var(--gold); font: 700 9px "Space Mono", monospace; writing-mode: vertical-rl; transform: rotate(180deg); }
+.coach-content { padding: 10px 12px; }
+.coach-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.coach-heading h2 { margin: 2px 0 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; }
+.coach-content > p { margin: 5px 0 8px; color: #b7c9d1; font-size: 11px; line-height: 1.35; }
+.text-button { padding: 3px 0; border: 0; color: var(--muted); background: none; font: 700 8px "Space Mono", monospace; letter-spacing: 0.1em; cursor: pointer; }
+.gate-key { display: flex; flex-wrap: wrap; gap: 5px; }
+.gate-key span { padding: 3px 6px; border: 1px solid rgba(118, 147, 162, 0.2); color: var(--muted); font: 7px "Space Mono", monospace; }
+.gate-key b { color: var(--text); }
+.coach-error { border-color: rgba(255, 79, 148, 0.65); animation: coach-shake 0.24s ease; }
+@keyframes coach-shake { 33% { transform: translateX(3px); } 66% { transform: translateX(-3px); } }
+
 .loom-panel {
   position: relative;
   min-height: 300px;
@@ -114,6 +138,8 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .gate { height: 54px; padding: 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--cyan); background: rgba(73, 231, 255, 0.07); cursor: grab; transition: transform 0.15s ease, box-shadow 0.15s ease; }
 .gate:active { cursor: grabbing; transform: translateY(1px) scale(0.98); }
 .gate:hover { box-shadow: 0 0 18px color-mix(in srgb, currentColor 24%, transparent); }
+.gate.hinted { animation: gate-hint 1.15s ease-in-out infinite; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.82), 0 0 24px currentColor; }
+@keyframes gate-hint { 50% { transform: translateY(-4px); filter: brightness(1.45); } }
 .gate strong { display: block; font: 700 19px "Space Mono", monospace; line-height: 1; }
 .gate span { display: block; margin-top: 5px; font: 700 7px "Space Mono", monospace; letter-spacing: 0.08em; }
 .gate-h { color: var(--gold); background: rgba(255, 204, 88, 0.07); }
@@ -125,6 +151,8 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 .secondary-button:disabled { opacity: 0.35; cursor: default; }
 .primary-button { border: 1px solid var(--cyan); color: #031015; background: var(--cyan); box-shadow: 0 0 22px rgba(73, 231, 255, 0.2); }
 .primary-button.ready { color: #1b0c00; border-color: var(--gold); background: var(--gold); box-shadow: 0 0 30px rgba(255, 204, 88, 0.35); }
+.primary-button.tutorial-hint { animation: pulse-hint 1.15s ease-in-out infinite; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 34px rgba(255, 204, 88, 0.42); }
+@keyframes pulse-hint { 50% { filter: brightness(1.25); transform: translateY(-2px); } }
 .wide { width: 100%; }
 
 .result-overlay { position: fixed; z-index: 20; inset: 0; padding: 20px; display: grid; place-items: center; background: rgba(2, 4, 8, 0.82); backdrop-filter: blur(8px); opacity: 0; transition: opacity 0.24s ease; }
@@ -148,11 +176,13 @@ h1 { margin: 1px 0 0; font-size: clamp(22px, 5vw, 30px); letter-spacing: 0.06em;
 }
 
 @media (max-height: 720px) {
-  .game-shell { grid-template-rows: auto auto minmax(245px, 1fr) auto auto; gap: 7px; }
+  .game-shell { grid-template-rows: auto auto auto minmax(245px, 1fr) auto auto; gap: 7px; }
   .objective-card { min-height: 59px; padding-block: 8px; }
   .gate-panel { padding-block: 8px; }
   .gate { height: 45px; }
   .gate span { margin-top: 2px; }
+  .tutorial-coach { min-height: 77px; }
+  .gate-key { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

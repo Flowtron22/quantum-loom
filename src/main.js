@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import "./style.css";
-import { GATES, applyGate, generatePuzzle, rankSolution, runCircuit, statesEqual } from "./quantum.js";
+import { GATES, generatePuzzle, rankSolution, runCircuit, statesEqual, tutorialPuzzle } from "./quantum.js";
 
 const els = {
   canvas: document.querySelector("#scene"),
@@ -22,6 +22,12 @@ const els = {
   resultCopy: document.querySelector("#result-copy"),
   next: document.querySelector("#next"),
   sound: document.querySelector("#sound-toggle"),
+  tutorialReplay: document.querySelector("#tutorial-replay"),
+  tutorialCoach: document.querySelector("#tutorial-coach"),
+  tutorialStep: document.querySelector("#tutorial-step"),
+  tutorialTitle: document.querySelector("#tutorial-title"),
+  tutorialCopy: document.querySelector("#tutorial-copy"),
+  tutorialSkip: document.querySelector("#tutorial-skip"),
 };
 
 let level = 1;
@@ -31,6 +37,26 @@ let placed = [];
 let current = [];
 let soundOn = true;
 let audioContext;
+let tutorialActive = false;
+
+const tutorialPrompts = [
+  {
+    title: "Flip the first strand",
+    copy: "LIVE q0 is |1〉, but we need to approach |+〉. Tap X₀ to flip q0 into |0〉.",
+  },
+  {
+    title: "Split the first strand",
+    copy: "Good. Now tap H₀. The H gate splits q0 from |0〉 into the target |+〉 state.",
+  },
+  {
+    title: "Fix the second strand",
+    copy: "q0 now matches. Tap X₁ to flip q1 from |0〉 to the target |1〉.",
+  },
+  {
+    title: "Stabilize the signature",
+    copy: "Both LIVE states match the TARGET. Press PULSE CIRCUIT to lock the branch.",
+  },
+];
 
 const renderer = new THREE.WebGLRenderer({ canvas: els.canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -172,6 +198,39 @@ function renderTray() {
   });
 }
 
+function tutorialPrefixIsCorrect() {
+  return placed.every((gate, index) => {
+    const expected = puzzle.solution[index];
+    return expected && gate.type === expected.type && gate.qubit === expected.qubit;
+  });
+}
+
+function updateTutorial() {
+  els.tutorialCoach.hidden = !tutorialActive;
+  els.tray.querySelectorAll(".gate").forEach((gate) => gate.classList.remove("hinted"));
+  els.pulse.classList.remove("tutorial-hint");
+  if (!tutorialActive) return;
+
+  const correct = tutorialPrefixIsCorrect();
+  const step = correct ? Math.min(placed.length, 3) : Math.min(placed.length, 2);
+  const prompt = tutorialPrompts[step];
+  els.tutorialStep.textContent = `${step + 1} / 4`;
+  els.tutorialTitle.textContent = correct ? prompt.title : "Undo the last gate";
+  els.tutorialCopy.textContent = correct
+    ? prompt.copy
+    : "That gate changes a different state. Tap the last filled slot or press UNDO, then follow the glowing gate.";
+  els.tutorialCoach.classList.toggle("coach-error", !correct);
+
+  if (correct && step < 3) {
+    const expected = puzzle.solution[step];
+    els.tray
+      .querySelector(`[data-type="${expected.type}"][data-qubit="${expected.qubit}"]`)
+      ?.classList.add("hinted");
+  } else if (correct) {
+    els.pulse.classList.add("tutorial-hint");
+  }
+}
+
 function renderSlots() {
   els.slots.innerHTML = "";
   for (let i = 0; i < puzzle.maxMoves; i += 1) {
@@ -203,6 +262,7 @@ function updateCircuit() {
   els.reset.disabled = placed.length === 0;
   els.pulse.classList.toggle("ready", statesEqual(current, puzzle.target));
   rebuildLoom();
+  updateTutorial();
 }
 
 function addGate(gate, index = placed.length) {
@@ -244,13 +304,20 @@ function showResult() {
   els.rank.textContent = rank;
   els.resultGates.textContent = placed.length;
   els.resultPar.textContent = puzzle.par;
-  els.resultCopy.textContent = rank === "S" ? "Optimal weave. No wasted motion." : rank === "A" ? "Clean signal. One gate from perfect." : "Stable, but the loom can be tighter.";
+  if (tutorialActive) {
+    localStorage.setItem("quantum-loom-tutorial", "complete");
+    tutorialActive = false;
+    els.resultCopy.textContent = "Training complete. You matched LIVE to TARGET and stabilized your first branch.";
+  } else {
+    els.resultCopy.textContent = rank === "S" ? "Optimal weave. No wasted motion." : rank === "A" ? "Clean signal. One gate from perfect." : "Stable, but the loom can be tighter.";
+  }
   els.result.hidden = false;
   requestAnimationFrame(() => els.result.classList.add("visible"));
 }
 
-function startLevel() {
-  puzzle = generatePuzzle(level);
+function startLevel(forceTutorial = false) {
+  tutorialActive = forceTutorial || (level === 1 && localStorage.getItem("quantum-loom-tutorial") !== "complete");
+  puzzle = tutorialActive ? tutorialPuzzle() : generatePuzzle(level);
   placed = [];
   current = puzzle.initial.slice();
   els.level.textContent = String(level).padStart(2, "0");
@@ -287,6 +354,17 @@ els.pulse.addEventListener("click", pulseCircuit);
 els.undo.addEventListener("click", () => placed.length && removeGate(placed.length - 1));
 els.reset.addEventListener("click", () => { placed = []; updateCircuit(); tone(120, 0.06); });
 els.next.addEventListener("click", () => { level += 1; startLevel(); });
+els.tutorialReplay.addEventListener("click", () => {
+  level = 1;
+  els.result.classList.remove("visible");
+  els.result.hidden = true;
+  startLevel(true);
+});
+els.tutorialSkip.addEventListener("click", () => {
+  tutorialActive = false;
+  localStorage.setItem("quantum-loom-tutorial", "complete");
+  updateTutorial();
+});
 els.sound.addEventListener("click", () => {
   soundOn = !soundOn;
   els.sound.textContent = soundOn ? "◉" : "○";

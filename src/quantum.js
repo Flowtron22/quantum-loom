@@ -96,6 +96,22 @@ export function generatePuzzle(level = 1, random = Math.random) {
   };
 }
 
+export function tutorialPuzzle() {
+  return {
+    initial: ["1", "0"],
+    target: ["+", "1"],
+    solution: [
+      { type: "X", qubit: 0 },
+      { type: "H", qubit: 0 },
+      { type: "X", qubit: 1 },
+    ],
+    par: 3,
+    maxMoves: 5,
+    qubitCount: 2,
+    isTutorial: true,
+  };
+}
+
 export function rankSolution(moves, par) {
   if (moves <= par) return "S";
   if (moves === par + 1) return "A";
