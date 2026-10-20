@@ -370,6 +370,31 @@ function emitBurst(position, color, count = 18, force = 1) {
   }
 }
 
+function emitSparks(position, color = 0xff315f, count = 30, force = 2.1) {
+  for (let index = 0; index < count; index += 1) {
+    const particle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.018, 0.11 + Math.random() * 0.15, 0.018),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending }),
+    );
+    particle.position.copy(position);
+    const angle = Math.random() * Math.PI * 2;
+    particle.rotation.z = angle;
+    particle.userData.velocity = new THREE.Vector3(Math.cos(angle) * (0.8 + Math.random() * force), Math.sin(angle) * (0.8 + Math.random() * force), (Math.random() - 0.5) * force);
+    particle.userData.life = 0.75 + Math.random() * 0.35;
+    particle.userData.spin = (Math.random() - 0.5) * 0.5;
+    burstParticles.add(particle);
+  }
+}
+
+function triggerFeedback(type) {
+  els.shell.classList.remove("feedback-success", "feedback-failure");
+  void els.shell.offsetWidth;
+  els.shell.classList.add(`feedback-${type}`);
+  const pattern = type === "success" ? [30, 35, 55, 35, 130] : [85, 35, 85, 35, 115];
+  try { navigator.vibrate?.(pattern); } catch {}
+  setTimeout(() => els.shell.classList.remove(`feedback-${type}`), type === "success" ? 1450 : 700);
+}
+
 function setControlsLocked(locked) {
   els.pulse.disabled = locked;
   els.undo.disabled = locked || placed.length === 0;
@@ -533,26 +558,28 @@ function finishPhysicalRun() {
     els.physicsStatus.className = "physics-status active success";
     els.physicsStatusText.textContent = "TIMELINES STABILIZED";
     targetChambers.children.forEach((chamber) => emitBurst(chamber.position, chamber.material.color.getHex(), 34, 1.55));
+    targetChambers.children.forEach((chamber) => emitSparks(chamber.position, 0xffcc58, 12, 1.35));
     targetChambers.children.forEach((chamber) => { chamber.userData.burst = 1; });
     loom.userData.pulse = 1;
     screenShake = 1;
+    triggerFeedback("success");
     tone(330, 0.12);
     setTimeout(() => tone(495, 0.16), 110);
     setTimeout(() => tone(742, 0.24), 230);
-    navigator.vibrate?.([35, 35, 80]);
     setTimeout(() => {
       simulation = null;
       els.physicsStatus.hidden = true;
       showResult();
-    }, 760);
+    }, 1080);
   } else {
     els.physicsStatus.className = "physics-status active failure";
     els.physicsStatusText.textContent = "BRANCH COLLISION";
     pulseActors.children.forEach((actor) => emitBurst(actor.position, 0xff315f, 24, 1.8));
+    pulseActors.children.forEach((actor, index) => emitSparks(actor.position, index % 3 === 0 ? 0xffcc58 : 0xff315f, 18, 2.4));
     pulseActors.visible = false;
-    screenShake = 0.75;
+    screenShake = 1.2;
+    triggerFeedback("failure");
     tone(82, 0.32);
-    navigator.vibrate?.(90);
     flash(els.live);
     setTimeout(() => {
       simulation = null;
@@ -616,6 +643,7 @@ function showResult() {
 
 function startLevel(forceTutorial = false) {
   simulation = null;
+  els.shell.classList.remove("feedback-success", "feedback-failure");
   clearGroup(pulseActors);
   clearGroup(burstParticles);
   els.physicsStatus.hidden = true;
@@ -724,6 +752,7 @@ function animate() {
     particle.userData.life -= 0.025;
     particle.position.addScaledVector(particle.userData.velocity, 0.025);
     particle.userData.velocity.multiplyScalar(0.965);
+    particle.rotation.z += particle.userData.spin || 0;
     particle.material.opacity = Math.max(0, particle.userData.life);
     particle.scale.setScalar(Math.max(0.1, particle.userData.life));
     if (particle.userData.life <= 0) {

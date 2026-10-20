@@ -416,6 +416,31 @@ function emitBurst(position, color, count = 20) {
   }
 }
 
+function emitSparks(position, color = 0xff315f, count = 30, force = 2.1) {
+  for (let index = 0; index < count; index += 1) {
+    const particle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.018, 0.11 + Math.random() * 0.15, 0.018),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending }),
+    );
+    particle.position.copy(position);
+    const angle = Math.random() * Math.PI * 2;
+    particle.rotation.z = angle;
+    particle.userData.velocity = new THREE.Vector3(Math.cos(angle) * (0.8 + Math.random() * force), Math.sin(angle) * (0.8 + Math.random() * force), (Math.random() - 0.5) * force);
+    particle.userData.life = 0.75 + Math.random() * 0.35;
+    particle.userData.spin = (Math.random() - 0.5) * 0.5;
+    bursts.add(particle);
+  }
+}
+
+function triggerFeedback(type) {
+  els.shell.classList.remove("feedback-success", "feedback-failure");
+  void els.shell.offsetWidth;
+  els.shell.classList.add(`feedback-${type}`);
+  const pattern = type === "success" ? [30, 35, 55, 35, 130] : [85, 35, 85, 35, 115];
+  try { navigator.vibrate?.(pattern); } catch {}
+  setTimeout(() => els.shell.classList.remove(`feedback-${type}`), type === "success" ? 1450 : 700);
+}
+
 function finishSimulation() {
   if (!simulation || simulation.finished) return;
   simulation.finished = true;
@@ -424,13 +449,16 @@ function finishSimulation() {
     els.physicsStatus.className = "physics-status active success";
     els.physicsStatusText.textContent = "STATE VECTOR ALIGNED";
     pulseActors.children.forEach((actor) => emitBurst(actor.position, actor.material.color.getHex(), 18));
+    pulseActors.children.forEach((actor) => emitSparks(actor.position, 0xffcc58, 10, 1.25));
     screenShake = 0.8;
+    triggerFeedback("success");
     tone(330, 0.12); setTimeout(() => tone(495, 0.16), 110); setTimeout(() => tone(742, 0.22), 230);
-    setTimeout(() => { simulation = null; els.physicsStatus.hidden = true; showResult(); }, 700);
+    setTimeout(() => { simulation = null; els.physicsStatus.hidden = true; showResult(); }, 1050);
   } else {
     els.physicsStatus.className = "physics-status active failure";
     els.physicsStatusText.textContent = "OUTPUT DOES NOT MATCH";
-    screenShake = 0.6; tone(82, 0.3); flash(els.live);
+    pulseActors.children.forEach((actor, index) => emitSparks(actor.position, index % 3 === 0 ? 0xffcc58 : 0xff315f, 18, 2.4));
+    screenShake = 1.15; triggerFeedback("failure"); tone(82, 0.3); flash(els.live);
     setTimeout(() => {
       simulation = null; clearGroup(pulseActors); els.physicsStatus.hidden = true;
       els.pulse.textContent = "PULSE CIRCUIT"; setControlsLocked(false);
@@ -487,6 +515,7 @@ function showResult() {
 
 function startLevel(forceTutorial = false) {
   simulation = null;
+  els.shell.classList.remove("feedback-success", "feedback-failure");
   helpOpen = false;
   helpResumeTutorial = false;
   clearGroup(pulseActors); clearGroup(bursts);
@@ -590,6 +619,7 @@ function animate() {
   markers.children.forEach((marker, index) => { marker.rotation.z = Math.sin(time * 1.8 + index) * 0.08; });
   bursts.children.slice().forEach((particle) => {
     particle.userData.life -= 0.03; particle.position.addScaledVector(particle.userData.velocity, 0.025);
+    particle.rotation.z += particle.userData.spin || 0;
     particle.material.opacity = Math.max(0, particle.userData.life);
     if (particle.userData.life <= 0) { bursts.remove(particle); particle.geometry.dispose(); particle.material.dispose(); }
   });
